@@ -6,5 +6,9 @@ contextBridge.exposeInMainWorld('api', {
 
   /** Get the current sidecar status */
   getSidecarStatus: (): Promise<string> =>
-    ipcRenderer.invoke('get-sidecar-status')
+    ipcRenderer.invoke('get-sidecar-status'),
+
+  /** Open file picker dialog and return selected file paths */
+  selectFiles: (): Promise<string[]> =>
+    ipcRenderer.invoke('select-files'),
 })

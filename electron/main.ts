@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { join } from 'path'
 import { SidecarManager } from './sidecar'
 
@@ -30,6 +30,14 @@ function createWindow(): void {
 function registerIpcHandlers(): void {
   ipcMain.handle('get-backend-url', () => backendUrl)
   ipcMain.handle('get-sidecar-status', () => sidecar?.state.status ?? 'stopped')
+  ipcMain.handle('select-files', async () => {
+    const win = BrowserWindow.getFocusedWindow()
+    const result = await dialog.showOpenDialog(win!, {
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+    })
+    return result.canceled ? [] : result.filePaths
+  })
 }
 
 async function startSidecar(): Promise<void> {
