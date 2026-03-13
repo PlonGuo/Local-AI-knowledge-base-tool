@@ -7,9 +7,9 @@ Plan: v1.1 (~/.claude/plans/lovely-knitting-hopper.md)
 === TASKS ===
 
 ## Phase 0: Project Rename
-[ ] Task 1: Rename GitHub repo to `knowhive` (manual)
-[ ] Task 2: Rename local directory + update git remote
-[ ] Task 3: Update PRD repo path reference
+[x] Task 1: Rename GitHub repo to `knowhive` (done via gh CLI)
+[x] Task 2: Update git remote URL to git@github.com:PlonGuo/knowhive.git (local dir rename is optional/manual)
+[x] Task 3: Update PRD repo path reference + v1.1 alignment
 
 ## Phase 1: POC — Electron + FastAPI Packaging Validation
 
@@ -40,3 +40,4 @@ Plan: v1.1 (~/.claude/plans/lovely-knitting-hopper.md)
 === LOG ===
 2026-03-12 — Ralph loop initialized. Phase 0 + Phase 1 tasks defined.
 2026-03-12 — Task 4 complete: frontend scaffold created. electron-vite build passes, tsc clean.
+2026-03-12 — Phase 0 complete: Tasks 1-3 done. GitHub repo renamed to knowhive, remote updated, PRD aligned with v1.1.
