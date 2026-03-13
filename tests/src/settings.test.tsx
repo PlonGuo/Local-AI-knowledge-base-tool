@@ -176,6 +176,50 @@ describe('SettingsPage', () => {
     })
   })
 
+  it('shows anthropic option in LLM provider selector', async () => {
+    render(<SettingsPage backendUrl={mockBackendUrl} />)
+    await waitFor(() => {
+      const select = screen.getByTestId('llm-provider-select')
+      const options = select.querySelectorAll('option')
+      const values = Array.from(options).map((o) => o.value)
+      expect(values).toContain('anthropic')
+    })
+  })
+
+  it('shows API key field when provider is anthropic', async () => {
+    mockFetchResponses({
+      '/config': { ...defaultConfig, llm_provider: 'anthropic', api_key: 'sk-ant-test', base_url: 'https://api.anthropic.com' },
+    })
+    render(<SettingsPage backendUrl={mockBackendUrl} />)
+    await waitFor(() => {
+      const input = screen.getByTestId('api-key-input') as HTMLInputElement
+      expect(input).toBeInTheDocument()
+      expect(input.value).toBe('sk-ant-test')
+    })
+  })
+
+  it('shows API key field after switching provider to anthropic', async () => {
+    render(<SettingsPage backendUrl={mockBackendUrl} />)
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('llama3')).toBeInTheDocument()
+    })
+    fireEvent.change(screen.getByTestId('llm-provider-select'), {
+      target: { value: 'anthropic' },
+    })
+    expect(screen.getByTestId('api-key-input')).toBeInTheDocument()
+  })
+
+  it('displays Anthropic Claude label for anthropic option', async () => {
+    render(<SettingsPage backendUrl={mockBackendUrl} />)
+    await waitFor(() => {
+      const select = screen.getByTestId('llm-provider-select')
+      const options = select.querySelectorAll('option')
+      const anthropicOption = Array.from(options).find((o) => o.value === 'anthropic')
+      expect(anthropicOption).toBeDefined()
+      expect(anthropicOption!.textContent).toBe('Anthropic Claude')
+    })
+  })
+
   it('has a back button that calls onBack', async () => {
     const onBack = vi.fn()
     render(<SettingsPage backendUrl={mockBackendUrl} onBack={onBack} />)

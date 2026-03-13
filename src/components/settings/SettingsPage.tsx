@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 interface AppConfig {
-  llm_provider: 'ollama' | 'openai-compatible'
+  llm_provider: 'ollama' | 'openai-compatible' | 'anthropic'
   model_name: string
   base_url: string
   api_key: string | null
@@ -109,6 +109,7 @@ export default function SettingsPage({ backendUrl, onBack }: SettingsPageProps) 
             >
               <option value="ollama">Ollama</option>
               <option value="openai-compatible">OpenAI Compatible</option>
+              <option value="anthropic">Anthropic Claude</option>
             </select>
           </div>
 
@@ -137,7 +138,7 @@ export default function SettingsPage({ backendUrl, onBack }: SettingsPageProps) 
           </div>
 
           {/* API Key (conditional) */}
-          {config.llm_provider === 'openai-compatible' && (
+          {(config.llm_provider === 'openai-compatible' || config.llm_provider === 'anthropic') && (
             <div>
               <label className={labelClass}>API Key</label>
               <input
