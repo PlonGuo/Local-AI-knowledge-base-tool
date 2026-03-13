@@ -10,6 +10,7 @@ from pydantic import BaseModel
 class LLMProvider(StrEnum):
     OLLAMA = "ollama"
     OPENAI_COMPATIBLE = "openai-compatible"
+    ANTHROPIC = "anthropic"
 
 
 class EmbeddingLanguage(StrEnum):

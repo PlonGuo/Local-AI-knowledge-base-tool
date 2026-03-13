@@ -38,6 +38,12 @@ async def test_llm_endpoint() -> dict:
             if cfg.llm_provider == LLMProvider.OLLAMA:
                 url = f"{cfg.base_url.rstrip('/')}/api/tags"
                 resp = await client.get(url)
+            elif cfg.llm_provider == LLMProvider.ANTHROPIC:
+                url = f"{cfg.base_url.rstrip('/')}/v1/models"
+                headers = {}
+                if cfg.api_key:
+                    headers["x-api-key"] = cfg.api_key
+                resp = await client.get(url, headers=headers)
             else:
                 # OpenAI-compatible: GET /models
                 url = f"{cfg.base_url.rstrip('/')}/models"

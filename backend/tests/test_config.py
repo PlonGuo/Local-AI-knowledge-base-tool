@@ -41,9 +41,21 @@ class TestConfigModel:
         assert cfg.llm_provider == LLMProvider.OPENAI_COMPATIBLE
         assert cfg.api_key == "sk-test-key"
 
+    def test_anthropic_provider(self):
+        cfg = AppConfig(
+            llm_provider=LLMProvider.ANTHROPIC,
+            model_name="claude-sonnet-4-20250514",
+            base_url="https://api.anthropic.com",
+            api_key="sk-ant-test-key",
+        )
+        assert cfg.llm_provider == LLMProvider.ANTHROPIC
+        assert cfg.base_url == "https://api.anthropic.com"
+        assert cfg.api_key == "sk-ant-test-key"
+
     def test_enum_values(self):
         assert LLMProvider.OLLAMA == "ollama"
         assert LLMProvider.OPENAI_COMPATIBLE == "openai-compatible"
+        assert LLMProvider.ANTHROPIC == "anthropic"
         assert EmbeddingLanguage.ENGLISH == "english"
         assert EmbeddingLanguage.CHINESE == "chinese"
         assert EmbeddingLanguage.MIXED == "mixed"
@@ -194,6 +206,27 @@ class TestConfigEndpoints:
         assert resp.status_code == 200
         assert resp.json()["model_name"] == "phi3"
 
+    def test_put_config_anthropic(self, client: TestClient):
+        resp = client.put(
+            "/config",
+            json={
+                "llm_provider": "anthropic",
+                "model_name": "claude-sonnet-4-20250514",
+                "base_url": "https://api.anthropic.com",
+                "api_key": "sk-ant-test",
+                "embedding_language": "english",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["llm_provider"] == "anthropic"
+        assert data["model_name"] == "claude-sonnet-4-20250514"
+        assert data["base_url"] == "https://api.anthropic.com"
+
+        # Verify persisted
+        resp2 = client.get("/config")
+        assert resp2.json()["llm_provider"] == "anthropic"
+
     def test_put_config_invalid_provider(self, client: TestClient):
         resp = client.put(
             "/config",
@@ -291,3 +324,39 @@ class TestTestLLMEndpoint:
         resp = test_client.post("/config/test-llm")
         assert resp.status_code == 200
         assert resp.json()["success"] is True
+
+    @patch("app.routers.config.httpx.AsyncClient")
+    def test_test_llm_anthropic(self, mock_client_cls, tmp_path: Path):
+        config_path = tmp_path / "config.yaml"
+        save_config(
+            AppConfig(
+                llm_provider=LLMProvider.ANTHROPIC,
+                base_url="https://api.anthropic.com",
+                model_name="claude-sonnet-4-20250514",
+                api_key="sk-ant-test",
+            ),
+            config_path,
+        )
+        app = create_app(config_path=config_path)
+        test_client = TestClient(app)
+
+        mock_response = AsyncMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"type": "model_list", "data": []}
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        mock_client_cls.return_value = mock_client
+
+        resp = test_client.post("/config/test-llm")
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+
+        # Verify it used x-api-key header (Anthropic style), not Bearer
+        call_kwargs = mock_client.get.call_args
+        headers = call_kwargs.kwargs.get("headers", {}) if call_kwargs.kwargs else {}
+        assert headers.get("x-api-key") == "sk-ant-test"
+        assert "Authorization" not in headers
