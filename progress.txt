@@ -70,7 +70,7 @@ Plan: ~/.claude/plans/zany-percolating-key.md
 ### 3A. File Management
 [x] Task 33: DELETE /knowledge/file endpoint (disk + DB + Chroma cleanup, path traversal protection)
 [x] Task 34: PUT /knowledge/file rename endpoint (disk rename + DB update + Chroma metadata)
-[ ] Task 35: Frontend context menu (right-click delete/rename on FileTree)
+[x] Task 35: Frontend context menu (right-click delete/rename on FileTree)
 
 ### 3B. PDF Support
 [ ] Task 36: PyMuPDF dependency + PDF text extractor utility
@@ -137,3 +137,4 @@ Plan: ~/.claude/plans/zany-percolating-key.md
 2026-03-13 — Task 32 complete: FastAPI lifespan in main.py wires all services end-to-end — init_db() creates tables, IngestService + RAGService instantiated, all router init_*() functions called with dependencies, SyncService.sync() runs on startup (ingests existing knowledge/ files), close_db() on shutdown; create_app() accepts db_path/chroma_path/knowledge_dir params for testability; 14 new e2e wiring tests; all 150 backend + 95 frontend tests pass; tsc clean.
 2026-03-13 — Task 34 complete: PUT /knowledge/file rename endpoint — RenameRequest model (old_path, new_path), path traversal protection on both paths, disk rename with parent dir creation, DB file_path+file_name update, Chroma metadata update via new rename_chunks_file_path() method on IngestService; 409 on target exists, 400 on directory; 15 new tests (rename 200, response body, content preserved, nested, move to dir, create parent dirs, 404, 409 conflict, traversal blocked x2, absolute blocked x2, directory blocked, DB update, Chroma metadata update); all 40 knowledge tests pass; 174/175 backend tests pass (1 pre-existing config test failure).
 2026-03-13 — Task 33 complete: DELETE /knowledge/file endpoint — path traversal protection (reused into _resolve_safe_path helper), disk deletion, DB document record cleanup, Chroma chunk cleanup via IngestService.delete_chunks_for_file(); init_knowledge_router now accepts optional ingest_service param; main.py passes ingest_service; 10 new tests (delete 200, response body, nested, 404, traversal, absolute, missing param, DB cleanup, Chroma cleanup, directory blocked); all 25 knowledge tests pass; 159/160 backend tests pass (1 pre-existing config test failure).
+2026-03-13 — Task 35 complete: FileTree context menu — right-click on files shows Rename/Delete menu (directories excluded); Delete triggers confirm() dialog then DELETE /knowledge/file with auto-refresh; Rename shows inline input (Enter submit, Escape cancel, blur cancel), PUT /knowledge/file with old/new paths, auto-refresh; outside click closes menu; 10 new tests; all 105 frontend tests pass; tsc clean.
