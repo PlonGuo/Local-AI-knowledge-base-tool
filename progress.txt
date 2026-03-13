@@ -14,7 +14,7 @@ Plan: v1.1 (~/.claude/plans/lovely-knitting-hopper.md)
 ## Phase 1: POC — Electron + FastAPI Packaging Validation
 
 ### 1A. Scaffolding
-[ ] Task 4: Initialize frontend scaffold (package.json, Vite, Electron, Tailwind, shadcn/ui)
+[x] Task 4: Initialize frontend scaffold (package.json, Vite, Electron, Tailwind, shadcn/ui)
 [ ] Task 5: Initialize backend scaffold (pyproject.toml, FastAPI, uv sync)
 
 ### 1B. FastAPI Backend
@@ -39,3 +39,4 @@ Plan: v1.1 (~/.claude/plans/lovely-knitting-hopper.md)
 
 === LOG ===
 2026-03-12 — Ralph loop initialized. Phase 0 + Phase 1 tasks defined.
+2026-03-12 — Task 4 complete: frontend scaffold created. electron-vite build passes, tsc clean.
