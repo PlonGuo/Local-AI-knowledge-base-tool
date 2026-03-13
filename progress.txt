@@ -150,7 +150,7 @@ Plan: ~/.claude/plans/tender-hatching-hopcroft.md
 
 ### 5B. Onboarding Flow
 [x] Task 82: Backend AppConfig.first_run_complete field + POST /setup/complete endpoint
-[ ] Task 83: Frontend OnboardingPage Step 1 — dependency check UI
+[x] Task 83: Frontend OnboardingPage Step 1 — dependency check UI
 [ ] Task 84: Frontend OnboardingPage Step 2 — LLM configuration
 [ ] Task 85: Frontend OnboardingPage Step 3 — ready + POST /setup/complete call
 [ ] Task 86: Wire OnboardingPage into App.tsx + AppLayout.tsx
