@@ -5,14 +5,21 @@ interface WatcherStatus {
   syncing: boolean
 }
 
+interface LlmConfig {
+  llm_provider: string
+  model_name: string
+}
+
 interface StatusBarProps {
   health: { status: string; version: string } | null
   error: string | null
   backendUrl?: string
+  configVersion?: number
 }
 
-export default function StatusBar({ health, error, backendUrl }: StatusBarProps) {
+export default function StatusBar({ health, error, backendUrl, configVersion }: StatusBarProps) {
   const [watcher, setWatcher] = useState<WatcherStatus | null>(null)
+  const [llmConfig, setLlmConfig] = useState<LlmConfig | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchWatcherStatus = async () => {
@@ -45,14 +52,32 @@ export default function StatusBar({ health, error, backendUrl }: StatusBarProps)
     }
   }
 
+  const fetchLlmConfig = async () => {
+    if (!backendUrl) return
+    try {
+      const res = await fetch(`${backendUrl}/config`)
+      if (res.ok) {
+        const data = await res.json()
+        setLlmConfig({ llm_provider: data.llm_provider, model_name: data.model_name })
+      }
+    } catch {
+      // silently ignore
+    }
+  }
+
   useEffect(() => {
     if (!backendUrl) return
     fetchWatcherStatus()
+    fetchLlmConfig()
     intervalRef.current = setInterval(fetchWatcherStatus, 10_000)
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
   }, [backendUrl])
+
+  useEffect(() => {
+    fetchLlmConfig()
+  }, [configVersion])
 
   let statusText: string
   let statusColor: string
@@ -89,6 +114,11 @@ export default function StatusBar({ health, error, backendUrl }: StatusBarProps)
       className="flex h-7 items-center justify-between border-t bg-secondary/50 px-4"
     >
       <span className={`text-xs ${statusColor}`}>{statusText}</span>
+      {llmConfig && (
+        <span data-testid="llm-indicator" className="text-xs text-muted-foreground">
+          {llmConfig.llm_provider} / {llmConfig.model_name}
+        </span>
+      )}
       {watcherLabel && (
         <button
           data-testid="watcher-indicator"

@@ -17,6 +17,7 @@ interface TestResult {
 interface SettingsPageProps {
   backendUrl: string
   onBack?: () => void
+  onConfigSaved?: () => void
 }
 
 const defaultConfig: AppConfig = {
@@ -27,7 +28,7 @@ const defaultConfig: AppConfig = {
   embedding_language: 'english',
 }
 
-export default function SettingsPage({ backendUrl, onBack }: SettingsPageProps) {
+export default function SettingsPage({ backendUrl, onBack, onConfigSaved }: SettingsPageProps) {
   const [config, setConfig] = useState<AppConfig>(defaultConfig)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
@@ -50,6 +51,7 @@ export default function SettingsPage({ backendUrl, onBack }: SettingsPageProps) 
         body: JSON.stringify(config),
       })
       setSaveMessage('Settings saved')
+      onConfigSaved?.()
     } catch {
       setSaveMessage('Failed to save settings')
     }

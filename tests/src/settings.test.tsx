@@ -240,4 +240,41 @@ describe('SettingsPage', () => {
       expect(screen.getByText('Settings saved')).toBeInTheDocument()
     })
   })
+
+  it('calls onConfigSaved after successful save', async () => {
+    const onConfigSaved = vi.fn()
+    mockFetchResponses({ '/config': defaultConfig })
+    render(<SettingsPage backendUrl={mockBackendUrl} onConfigSaved={onConfigSaved} />)
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('llama3')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('save-button'))
+
+    await waitFor(() => {
+      expect(onConfigSaved).toHaveBeenCalledOnce()
+    })
+  })
+
+  it('does not call onConfigSaved when save fails', async () => {
+    const onConfigSaved = vi.fn()
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const method = init?.method ?? 'GET'
+      if (method === 'PUT') {
+        throw new Error('network error')
+      }
+      return { ok: true, json: () => Promise.resolve(defaultConfig) } as Response
+    })
+    render(<SettingsPage backendUrl={mockBackendUrl} onConfigSaved={onConfigSaved} />)
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('llama3')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTestId('save-button'))
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to save settings')).toBeInTheDocument()
+    })
+    expect(onConfigSaved).not.toHaveBeenCalled()
+  })
 })

@@ -14,6 +14,7 @@ interface AppLayoutProps {
 export default function AppLayout({ health, error, backendUrl }: AppLayoutProps) {
   const [view, setView] = useState<'chat' | 'settings' | 'editor'>('chat')
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
+  const [configVersion, setConfigVersion] = useState(0)
 
   const handleFileSelect = (path: string) => {
     setSelectedFilePath(path)
@@ -35,7 +36,7 @@ export default function AppLayout({ health, error, backendUrl }: AppLayoutProps)
           backendUrl={backendUrl}
         />
         {view === 'settings' ? (
-          <SettingsPage backendUrl={backendUrl} onBack={() => setView('chat')} />
+          <SettingsPage backendUrl={backendUrl} onBack={() => setView('chat')} onConfigSaved={() => setConfigVersion((v) => v + 1)} />
         ) : view === 'editor' && selectedFilePath ? (
           <MarkdownEditor
             backendUrl={backendUrl}
@@ -46,7 +47,7 @@ export default function AppLayout({ health, error, backendUrl }: AppLayoutProps)
           <ChatArea backendUrl={backendUrl} />
         )}
       </div>
-      <StatusBar health={health} error={error} backendUrl={backendUrl} />
+      <StatusBar health={health} error={error} backendUrl={backendUrl} configVersion={configVersion} />
     </div>
   )
 }
