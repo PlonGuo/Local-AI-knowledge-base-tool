@@ -24,10 +24,9 @@ describe('App', () => {
   })
 
   it('shows connecting state initially', () => {
-    // Mock fetch to never resolve so we stay in loading state
     vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}))
     render(<App />)
-    expect(screen.getByText('Connecting to backend...')).toBeInTheDocument()
+    expect(screen.getByText('Connecting...')).toBeInTheDocument()
   })
 
   it('displays health status on successful /health call', async () => {
@@ -50,7 +49,7 @@ describe('App', () => {
     render(<App />)
 
     await waitFor(() => {
-      expect(screen.getByText('Backend unreachable: fetch failed')).toBeInTheDocument()
+      expect(screen.getByText('Disconnected')).toBeInTheDocument()
     })
   })
 
@@ -73,10 +72,9 @@ describe('App', () => {
     })
   })
 
-  it('renders KnowHive title and tagline', () => {
+  it('renders KnowHive title', () => {
     vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}))
     render(<App />)
     expect(screen.getByText('KnowHive')).toBeInTheDocument()
-    expect(screen.getByText('Local-first AI knowledge base')).toBeInTheDocument()
   })
 })

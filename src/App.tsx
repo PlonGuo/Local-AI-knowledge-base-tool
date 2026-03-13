@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import AppLayout from './components/layout/AppLayout'
 
 interface HealthStatus {
   status: string
@@ -23,23 +24,5 @@ export default function App() {
     fetchHealth()
   }, [])
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="rounded-lg border bg-card p-8 shadow-sm text-center space-y-4">
-        <h1 className="text-2xl font-bold text-foreground">KnowHive</h1>
-        <p className="text-sm text-muted-foreground">Local-first AI knowledge base</p>
-        <div className="mt-4 rounded-md bg-muted p-4 text-left font-mono text-sm">
-          {error ? (
-            <span className="text-red-500">Backend unreachable: {error}</span>
-          ) : health ? (
-            <span className="text-green-600">
-              Backend: {health.status} v{health.version}
-            </span>
-          ) : (
-            <span className="text-muted-foreground">Connecting to backend...</span>
-          )}
-        </div>
-      </div>
-    </div>
-  )
+  return <AppLayout health={health} error={error} />
 }
