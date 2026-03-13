@@ -7,7 +7,7 @@ from typing import Optional
 import httpx
 from fastapi import APIRouter
 
-from app.config import load_config
+from app.config import load_config, save_config
 
 logger = logging.getLogger(__name__)
 
@@ -30,12 +30,13 @@ def _reset_setup_router() -> None:
 async def get_setup_status() -> dict:
     """Return environment readiness checks for the onboarding wizard."""
     uv_ok = shutil.which("uv") is not None
-    first_run = _config_path is None or not _config_path.exists()
+    cfg_for_status = load_config(_config_path) if _config_path else None
+    first_run = cfg_for_status is None or not cfg_for_status.first_run_complete
 
     # Check Ollama connectivity if provider is ollama
     ollama_ok = False
     try:
-        cfg = load_config(_config_path) if _config_path else None
+        cfg = cfg_for_status
         if cfg is None or cfg.llm_provider == "ollama":
             async with httpx.AsyncClient(timeout=2.0) as client:
                 resp = await client.get(f"{cfg.base_url if cfg else 'http://localhost:11434'}/api/tags")
@@ -52,3 +53,13 @@ async def get_setup_status() -> dict:
         "ollama_ok": ollama_ok,
         "first_run": first_run,
     }
+
+
+@router.post("/setup/complete")
+async def post_setup_complete() -> dict:
+    """Mark onboarding as complete by setting first_run_complete=True in config."""
+    if _config_path is not None:
+        cfg = load_config(_config_path)
+        cfg = cfg.model_copy(update={"first_run_complete": True})
+        save_config(cfg, _config_path)
+    return {"ok": True}

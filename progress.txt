@@ -149,7 +149,7 @@ Plan: ~/.claude/plans/tender-hatching-hopcroft.md
 [x] Task 81: Backend GET /setup/status endpoint (python_ok, uv_ok, ollama_ok, first_run)
 
 ### 5B. Onboarding Flow
-[ ] Task 82: Backend AppConfig.first_run_complete field + POST /setup/complete endpoint
+[x] Task 82: Backend AppConfig.first_run_complete field + POST /setup/complete endpoint
 [ ] Task 83: Frontend OnboardingPage Step 1 — dependency check UI
 [ ] Task 84: Frontend OnboardingPage Step 2 — LLM configuration
 [ ] Task 85: Frontend OnboardingPage Step 3 — ready + POST /setup/complete call

@@ -25,6 +25,7 @@ class AppConfig(BaseModel):
     base_url: str = "http://localhost:11434"
     api_key: Optional[str] = None
     embedding_language: EmbeddingLanguage = EmbeddingLanguage.ENGLISH
+    first_run_complete: bool = False
 
 
 def load_config(config_path: Path) -> AppConfig:
