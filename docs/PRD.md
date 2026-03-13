@@ -106,10 +106,9 @@ KnowHive 是一款**本地优先 (local-first)** 的通用 AI 知识库桌面工
 | Electron 基础壳 | 双击 .app 可见窗口 |
 | FastAPI sidecar 启动 | health check 返回 200 |
 | 前后端通信 | 页面显示 FastAPI 返回内容 |
-| 打包验证 | 无 Python 环境的 macOS 机器上可运行 |
 | 动态端口 | 多实例不冲突 |
 
-技术要点: `python-build-standalone` 嵌入 Python，Electron Builder extraResources 打包
+技术要点: 要求用户系统安装 Python 3.11+ 和 uv，Electron 通过 sidecar 启动 FastAPI
 
 ### Phase 2: 核心 RAG (MVP)
 

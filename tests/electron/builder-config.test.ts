@@ -34,22 +34,9 @@ describe('electron-builder.yml configuration', () => {
     expect(config.files).toContain('out/**/*')
   })
 
-  it('configures extraResources for python and backend', () => {
+  it('does not bundle extraResources (system Python approach)', () => {
     const config = loadConfig()
-    expect(config.extraResources).toBeDefined()
-    expect(Array.isArray(config.extraResources)).toBe(true)
-
-    const pythonResource = config.extraResources.find(
-      (r: { from: string }) => r.from === 'extraResources/python'
-    )
-    expect(pythonResource).toBeDefined()
-    expect(pythonResource.to).toBe('python')
-
-    const backendResource = config.extraResources.find(
-      (r: { from: string }) => r.from === 'extraResources/backend'
-    )
-    expect(backendResource).toBeDefined()
-    expect(backendResource.to).toBe('backend')
+    expect(config.extraResources).toBeUndefined()
   })
 
   it('configures macOS target with dmg and hardened runtime', () => {

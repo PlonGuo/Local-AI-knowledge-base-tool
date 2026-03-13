@@ -11,16 +11,6 @@ files:
   - "!**/.DS_Store"
   - "!**/node_modules/.cache/**"
 
-extraResources:
-  - from: extraResources/python
-    to: python
-    filter:
-      - "**/*"
-  - from: extraResources/backend
-    to: backend
-    filter:
-      - "**/*"
-
 mac:
   target:
     - target: dmg

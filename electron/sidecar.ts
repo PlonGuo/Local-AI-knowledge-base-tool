@@ -99,38 +99,21 @@ export class SidecarManager {
 
   private resolvePythonPath(): string {
     if (this.pythonPath) return this.pythonPath
-
-    if (app.isPackaged) {
-      // In packaged mode, use python from extraResources
-      const binDir = process.platform === 'win32' ? 'python.exe' : path.join('bin', 'python3.11')
-      return path.join(process.resourcesPath, 'python', binDir)
-    }
-
-    // Dev mode: use uv run
+    // Always use system uv — users must have Python + uv installed
     return 'uv'
   }
 
   private resolveBackendDir(): string {
     if (this.backendDir) return this.backendDir
-
-    if (app.isPackaged) {
-      return path.join(process.resourcesPath, 'backend')
-    }
-
     return path.join(app.getAppPath(), 'backend')
   }
 
   private buildArgs(): string[] {
-    const pythonCmd = this.resolvePythonPath()
-    if (pythonCmd === 'uv') {
-      return ['run', 'python', '-m', 'app.main', '--port', String(this._port)]
-    }
-    return ['-m', 'app.main', '--port', String(this._port)]
+    return ['run', 'python', '-m', 'app.main', '--port', String(this._port)]
   }
 
   private resolveLogsDir(): string {
     if (app.isPackaged) {
-      // In packaged mode, write logs to userData (writable)
       return path.join(app.getPath('userData'), 'logs')
     }
     return path.join(app.getAppPath(), 'logs')
@@ -148,27 +131,7 @@ export class SidecarManager {
   }
 
   private buildSpawnEnv(): NodeJS.ProcessEnv {
-    const env = { ...process.env }
-
-    if (app.isPackaged) {
-      const backendDir = this.resolveBackendDir()
-      const venvDir = path.join(backendDir, '.venv')
-      env['VIRTUAL_ENV'] = venvDir
-
-      // Ensure the venv's site-packages are on PYTHONPATH so imports resolve
-      const sitePackages = process.platform === 'win32'
-        ? path.join(venvDir, 'Lib', 'site-packages')
-        : path.join(venvDir, 'lib', 'python3.11', 'site-packages')
-      env['PYTHONPATH'] = sitePackages
-
-      // Prepend venv bin to PATH
-      const venvBin = process.platform === 'win32'
-        ? path.join(venvDir, 'Scripts')
-        : path.join(venvDir, 'bin')
-      env['PATH'] = `${venvBin}${path.delimiter}${env['PATH'] ?? ''}`
-    }
-
-    return env
+    return { ...process.env }
   }
 
   private async spawnProcess(): Promise<void> {
