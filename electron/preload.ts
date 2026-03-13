@@ -15,4 +15,8 @@ contextBridge.exposeInMainWorld('api', {
   /** Open save dialog and return selected file path, or null if canceled */
   saveFile: (defaultName: string): Promise<string | null> =>
     ipcRenderer.invoke('save-file', defaultName),
+
+  /** Check if required system tools (uv) are available */
+  checkSetup: (): Promise<{ uv_ok: boolean }> =>
+    ipcRenderer.invoke('check-setup'),
 })

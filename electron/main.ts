@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { join } from 'path'
+import { spawn } from 'node:child_process'
 import { SidecarManager } from './sidecar'
 
 let sidecar: SidecarManager | null = null
@@ -44,6 +45,23 @@ function registerIpcHandlers(): void {
       defaultPath: defaultName,
     })
     return result.canceled ? null : result.filePath ?? null
+  })
+  ipcMain.handle('check-setup', async () => {
+    const uvOk = await checkCommand('uv', ['--version'])
+    return { uv_ok: uvOk }
+  })
+}
+
+/** Probe whether a command is available and exits successfully. */
+function checkCommand(cmd: string, args: string[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      const proc = spawn(cmd, args, { stdio: 'ignore', timeout: 3000 })
+      proc.on('close', (code) => resolve(code === 0))
+      proc.on('error', () => resolve(false))
+    } catch {
+      resolve(false)
+    }
   })
 }
 
