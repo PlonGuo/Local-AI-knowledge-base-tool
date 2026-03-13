@@ -33,7 +33,20 @@ class IngestService:
         create_kwargs: dict[str, Any] = {"name": collection_name}
         if embedding_function is not None:
             create_kwargs["embedding_function"] = embedding_function
-        self._collection = self._client.get_or_create_collection(**create_kwargs)
+        try:
+            self._collection = self._client.get_or_create_collection(**create_kwargs)
+        except ValueError as e:
+            # Existing collection has a different embedding function configured.
+            # Fall back to opening without specifying one (use persisted config).
+            if "embedding function" in str(e).lower() and embedding_function is not None:
+                logger.warning(
+                    "Embedding function conflict on collection '%s': %s. "
+                    "Opening with persisted embedding function.",
+                    collection_name, e,
+                )
+                self._collection = self._client.get_or_create_collection(name=collection_name)
+            else:
+                raise
         self._splitter = RecursiveCharacterTextSplitter(
             chunk_size=CHUNK_SIZE,
             chunk_overlap=CHUNK_OVERLAP,
