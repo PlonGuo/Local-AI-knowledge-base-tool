@@ -11,7 +11,7 @@ Plan: v1.1 (~/.claude/plans/lovely-knitting-hopper.md)
 [x] Task 2: Update git remote URL to git@github.com:PlonGuo/knowhive.git (local dir rename is optional/manual)
 [x] Task 3: Update PRD repo path reference + v1.1 alignment
 
-## Phase 1: POC — Electron + FastAPI Packaging Validation
+## Phase 1: POC — Electron + FastAPI Architecture Validation
 
 ### 1A. Scaffolding
 [x] Task 4: Initialize frontend scaffold (package.json, Vite, Electron, Tailwind, shadcn/ui)
@@ -32,10 +32,37 @@ Plan: v1.1 (~/.claude/plans/lovely-knitting-hopper.md)
 [x] Task 13: Minimal React app calling /health and displaying result
 [x] Task 14: pnpm dev:all script (Vite + uvicorn + Electron in parallel)
 
-### 1E. Packaging
-[x] Task 15: electron-builder.yml configuration
-[x] Task 16: build-backend.sh script (python-build-standalone + uv sync)
-[x] Task 17: Sidecar packaged mode (extraResources paths, .app size < 500MB)
+### 1E. Packaging (REVISED — system Python, no bundling)
+[x] Task 15: electron-builder.yml configuration (simplified: removed extraResources for python/backend)
+[—] Task 16: OBSOLETE — deleted build-backend.sh (no longer bundling Python)
+[x] Task 17: Sidecar simplified — uses system uv in all modes
+
+## Phase 2: Core RAG (MVP)
+
+### 2A. Backend Infrastructure
+[ ] Task 18: Add RAG dependencies (langchain-core, chromadb, sentence-transformers, aiosqlite)
+[ ] Task 19: SQLite database setup (documents, chat_messages, ingest_tasks tables + Pydantic models)
+[ ] Task 20: Config system (config.yaml read/write + /config endpoints + /config/test-llm)
+
+### 2B. Ingest Pipeline
+[ ] Task 21: Ingest service (Markdown load, text split, embed, Chroma store, dedup)
+[ ] Task 22: Ingest API endpoints (POST /ingest/files, GET /ingest/status, POST /ingest/resync)
+
+### 2C. Knowledge & Chat
+[ ] Task 23: Knowledge API (GET /knowledge/tree, GET /knowledge/file)
+[ ] Task 24: RAG query service (Chroma retrieval + prompt assembly + LLM call)
+[ ] Task 25: Chat API with SSE streaming (POST /chat, GET/DELETE /chat/history)
+[ ] Task 26: Startup sync service (scan knowledge/, diff with DB, re-embed changes)
+
+### 2D. React Frontend
+[ ] Task 27: App layout shell (sidebar + chat + status bar)
+[ ] Task 28: Settings page (LLM config, embedding language, test connection)
+[ ] Task 29: File tree sidebar (knowledge/ browser, import button)
+[ ] Task 30: Chat interface (messages, input, SSE streaming, source citations)
+[ ] Task 31: Import flow (file picker, ingest API, progress bar)
+
+### 2E. Integration
+[ ] Task 32: End-to-end wiring (IPC bridge updates, startup sync, full flow)
 
 === LOG ===
 2026-03-12 — Ralph loop initialized. Phase 0 + Phase 1 tasks defined.
@@ -53,3 +80,5 @@ Plan: v1.1 (~/.claude/plans/lovely-knitting-hopper.md)
 2026-03-12 — Task 15 complete: electron-builder.yml already configured with extraResources (python/ + backend/), macOS dmg target (arm64+x64), hardened runtime, entitlements; created build/entitlements.mac.plist with JIT, network, file access; 9 builder-config tests; pnpm build:dry validates successfully; all 33 tests pass.
 2026-03-12 — Task 16 complete: scripts/build-backend.sh downloads python-build-standalone 3.11.11, extracts to extraResources/python/, copies backend app + runs uv sync --no-dev into extraResources/backend/; platform detection (macOS/Linux, arm64/x64); 12 tests (structure + integration); all 45 tests pass.
 2026-03-12 — Task 17 complete: sidecar.ts updated for packaged mode — logs to userData (not asar), VIRTUAL_ENV+PYTHONPATH+PATH env vars for venv site-packages, cross-platform python path (win32 python.exe), 16 packaged-mode tests; all 49 tests pass; tsc clean.
+2026-03-12 — ARCHITECTURE DECISION: Switch from bundled Python (python-build-standalone) to system Python. Rationale: target users are developers who already need Ollama; bundling Python adds complexity (C extensions, size, cross-platform) without proportional benefit for an open-source dev tool. Task 16 obsolete, Tasks 15/17 need simplification. Skipping POC packaging validation — moving directly to Phase 2.
+2026-03-12 — Cleanup complete: deleted build-backend.sh + tests, deleted sidecar-packaged.test.ts, simplified sidecar.ts (removed extraResources/VIRTUAL_ENV/PYTHONPATH logic), simplified electron-builder.yml (removed extraResources), updated PRD + feature-requirements. tsc clean, 28/28 tests pass.

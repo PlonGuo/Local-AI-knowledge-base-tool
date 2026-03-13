@@ -39,11 +39,45 @@
 - [ ] Task 13: Implement minimal React app that calls `/health` and displays result — `src/App.tsx` fetches `GET /health` on load, shows `{"status":"ok"}` in UI — verified by: `pnpm dev` shows backend status in browser/Electron window
 - [ ] Task 14: Implement `pnpm dev:all` script — `package.json` script starts Vite + uvicorn + Electron in parallel (using `concurrently`) — verified by: `pnpm dev:all` launches all three processes; Electron window shows FastAPI health response
 
-### 1E. Packaging & Distribution
+### 1E. Packaging (REVISED — system Python, no bundling)
 
-- [ ] Task 15: Configure `electron-builder.yml` — set up extraResources for `python/` (python-build-standalone) and `backend/` (app code + .venv), configure macOS target (.dmg + .app), enable hardened runtime for code signing — verified by: `electron-builder.yml` is valid YAML, `pnpm build:dry` (no actual build) passes config validation
-- [ ] Task 16: Write build script `scripts/build-backend.sh` — installs python-build-standalone, runs `uv sync --no-dev` in backend/, packages result into `extraResources/` — verified by: script runs without error on macOS, `extraResources/python/bin/python3.11` exists, `extraResources/backend/.venv/` contains site-packages
-- [ ] Task 17: Update sidecar.ts for packaged mode — detect `app.isPackaged`, resolve python binary and backend path from `extraResources/`, use embedded python to run FastAPI — verified by: `pnpm build` produces `.app`; opening it (no system Python required) shows Electron window with FastAPI health response; packaged `.app` total size < 500MB (excluding embedding models)
+- [x] Task 15: Configure `electron-builder.yml` — macOS target (.dmg + .app), hardened runtime, no extraResources for Python — verified by: valid YAML, `pnpm build:dry` passes
+- [—] Task 16: OBSOLETE — no longer bundling Python; users install Python + uv themselves
+- [x] Task 17: Sidecar uses system `uv` to run FastAPI in both dev and packaged mode — verified by: `pnpm dev:all` launches sidecar successfully
+
+---
+
+## Phase 2: Core RAG (MVP)
+
+### 2A. Backend Infrastructure
+
+- [ ] Task 18: Add RAG dependencies — add langchain-core, langchain-community, langchain-text-splitters, chromadb, sentence-transformers, aiosqlite to pyproject.toml; `uv sync` — verified by: `cd backend && uv run python -c "import langchain_core, chromadb, sentence_transformers; print('ok')"`
+- [ ] Task 19: SQLite database setup — implement `app/database.py` with async SQLite connection manager, create `documents`, `chat_messages`, `ingest_tasks` tables per PRD schema; `app/models.py` with Pydantic models — verified by: `cd backend && uv run pytest tests/test_database.py -v` passes
+- [ ] Task 20: Config system — implement `app/config.py` to read/write `config.yaml` (LLM provider, model name, base URL, API key, embedding language); add `GET /config`, `PUT /config`, `POST /config/test-llm` endpoints — verified by: `cd backend && uv run pytest tests/test_config.py -v` passes
+
+### 2B. Ingest Pipeline
+
+- [ ] Task 21: Ingest service — implement `app/services/ingest_service.py`: load Markdown files, split with RecursiveCharacterTextSplitter (chunk_size=1000, overlap=200), embed with sentence-transformers, store in Chroma with metadata (file_path, chunk_index); deduplicate by file_path — verified by: `cd backend && uv run pytest tests/test_ingest_service.py -v` passes
+- [ ] Task 22: Ingest API endpoints — implement `app/routers/ingest.py`: `POST /ingest/files` (accept file paths, return task_id), `GET /ingest/status/{id}` (progress), `POST /ingest/resync` (manual sync trigger) — verified by: `cd backend && uv run pytest tests/test_ingest_api.py -v` passes
+
+### 2C. Knowledge & Chat
+
+- [ ] Task 23: Knowledge API — implement `app/routers/knowledge.py`: `GET /knowledge/tree` (file tree JSON), `GET /knowledge/file?path=` (file content read-only) — verified by: `cd backend && uv run pytest tests/test_knowledge_api.py -v` passes
+- [ ] Task 24: RAG query service — implement `app/services/rag_service.py`: Chroma top-k retrieval (default k=5), prompt assembly (system prompt + context + user question), LLM call via langchain ChatModel (Ollama or OpenAI-compatible) — verified by: `cd backend && uv run pytest tests/test_rag_service.py -v` passes
+- [ ] Task 25: Chat API with SSE streaming — implement `app/routers/chat.py`: `POST /chat` (SSE stream with token/sources/done events), `GET /chat/history` (with limit/offset), `DELETE /chat/history` — verified by: `cd backend && uv run pytest tests/test_chat_api.py -v` passes
+- [ ] Task 26: Startup sync — implement `app/services/sync_service.py`: on startup scan knowledge/ dir, compare with SQLite (new → embed, modified → re-embed, deleted → remove vectors + DB records) — verified by: `cd backend && uv run pytest tests/test_sync_service.py -v` passes
+
+### 2D. React Frontend
+
+- [ ] Task 27: App layout shell — implement main layout with sidebar (left), chat area (center), status bar (bottom) using shadcn/ui + Tailwind; responsive split pane — verified by: `pnpm vitest run` passes, `pnpm tsc --noEmit` clean
+- [ ] Task 28: Settings page — implement settings UI: LLM provider selector, model name, base URL, API key (conditional), embedding language, test connection button; calls `GET/PUT /config` and `POST /config/test-llm` — verified by: `pnpm vitest run` passes
+- [ ] Task 29: File tree sidebar — implement knowledge file tree component: fetches `GET /knowledge/tree`, displays collapsible tree, click opens read-only preview; import button triggers file/folder picker via IPC — verified by: `pnpm vitest run` passes
+- [ ] Task 30: Chat interface — implement chat UI: message list with Markdown rendering, chat input (Enter send, Shift+Enter newline), SSE streaming display, source file citations; calls `POST /chat`, `GET/DELETE /chat/history` — verified by: `pnpm vitest run` passes
+- [ ] Task 31: Import flow — implement import UI: file/folder picker dialog (via Electron IPC), call `POST /ingest/files`, show progress bar, refresh file tree on completion — verified by: `pnpm vitest run` passes
+
+### 2E. Integration
+
+- [ ] Task 32: End-to-end wiring — connect frontend to all backend APIs via IPC bridge; update preload.ts and main.ts with new IPC channels; startup sync on app launch — verified by: `pnpm dev:all` launches, settings page works, file import works, chat returns RAG responses (manual)
 
 ---
 
@@ -61,7 +95,4 @@ pnpm lint
 
 # Dev mode smoke test
 pnpm dev:all  # manual: verify Electron window shows {"status":"ok"}
-
-# Package size check
-du -sh dist/*.app
 ```
