@@ -60,6 +60,16 @@ def openai_config():
     )
 
 
+@pytest.fixture
+def anthropic_config():
+    return AppConfig(
+        llm_provider=LLMProvider.ANTHROPIC,
+        model_name="claude-sonnet-4-20250514",
+        base_url="https://api.anthropic.com",
+        api_key="sk-ant-test-key",
+    )
+
+
 # ── Retrieval tests ──────────────────────────────────────────
 
 
@@ -324,3 +334,160 @@ async def test_query_custom_k(rag_service, mock_collection, default_config):
         await rag_service.query("test", default_config, k=10)
 
     mock_collection.query.assert_called_once_with(query_texts=["test"], n_results=10)
+
+
+# ── LLM call (Anthropic) ────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_call_llm_anthropic(rag_service, anthropic_config):
+    """call_llm() sends correct request to Anthropic Messages API."""
+    messages = [
+        {"role": "system", "content": "You are helpful."},
+        {"role": "user", "content": "Hi"},
+    ]
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "content": [{"type": "text", "text": "Hello from Claude!"}],
+    }
+
+    with patch("app.services.rag_service.httpx.AsyncClient") as MockClient:
+        mock_client = AsyncMock()
+        mock_client.post.return_value = mock_response
+        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        result = await rag_service.call_llm(messages, anthropic_config)
+
+    assert result == "Hello from Claude!"
+    call_args = mock_client.post.call_args
+    # Endpoint is /v1/messages
+    assert "/v1/messages" in call_args[0][0]
+    # Uses x-api-key header (not Bearer)
+    assert call_args[1]["headers"]["x-api-key"] == "sk-ant-test-key"
+    assert call_args[1]["headers"]["anthropic-version"] == "2023-06-01"
+    # System prompt extracted from messages into 'system' field
+    body = call_args[1]["json"]
+    assert body["system"] == "You are helpful."
+    assert body["model"] == "claude-sonnet-4-20250514"
+    assert body["max_tokens"] == 4096
+    # Messages should NOT contain system role
+    assert all(m["role"] != "system" for m in body["messages"])
+    assert body["messages"] == [{"role": "user", "content": "Hi"}]
+
+
+@pytest.mark.asyncio
+async def test_call_llm_anthropic_no_system(rag_service, anthropic_config):
+    """call_llm() works with Anthropic when no system message is present."""
+    messages = [{"role": "user", "content": "Hi"}]
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "content": [{"type": "text", "text": "Hello!"}],
+    }
+
+    with patch("app.services.rag_service.httpx.AsyncClient") as MockClient:
+        mock_client = AsyncMock()
+        mock_client.post.return_value = mock_response
+        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        result = await rag_service.call_llm(messages, anthropic_config)
+
+    assert result == "Hello!"
+    body = mock_client.post.call_args[1]["json"]
+    # No system field when no system message
+    assert "system" not in body
+    assert body["messages"] == [{"role": "user", "content": "Hi"}]
+
+
+# ── LLM streaming (Anthropic) ──────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_call_llm_stream_anthropic(rag_service, anthropic_config):
+    """call_llm_stream() yields tokens from Anthropic SSE stream."""
+    messages = [
+        {"role": "system", "content": "You are helpful."},
+        {"role": "user", "content": "Hi"},
+    ]
+
+    # Simulate Anthropic SSE lines
+    sse_lines = [
+        'event: message_start',
+        'data: {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","content":[]}}',
+        '',
+        'event: content_block_start',
+        'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+        '',
+        'event: content_block_delta',
+        'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}',
+        '',
+        'event: content_block_delta',
+        'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" Claude"}}',
+        '',
+        'event: content_block_stop',
+        'data: {"type":"content_block_stop","index":0}',
+        '',
+        'event: message_stop',
+        'data: {"type":"message_stop"}',
+        '',
+    ]
+
+    mock_resp = AsyncMock()
+    mock_resp.status_code = 200
+    mock_resp.aiter_lines = MagicMock(return_value=_async_iter(sse_lines))
+
+    stream_cm = MagicMock()
+    stream_cm.__aenter__ = AsyncMock(return_value=mock_resp)
+    stream_cm.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("app.services.rag_service.httpx.AsyncClient") as MockClient:
+        mock_client = MagicMock()
+        mock_client.stream = MagicMock(return_value=stream_cm)
+        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        tokens = []
+        async for token in rag_service.call_llm_stream(messages, anthropic_config):
+            tokens.append(token)
+
+    assert tokens == ["Hello", " Claude"]
+    call_args = mock_client.stream.call_args
+    assert "/v1/messages" in call_args[0][1]
+    assert call_args[1]["headers"]["x-api-key"] == "sk-ant-test-key"
+    body = call_args[1]["json"]
+    assert body["stream"] is True
+    assert body["system"] == "You are helpful."
+    assert all(m["role"] != "system" for m in body["messages"])
+
+
+@pytest.mark.asyncio
+async def test_call_llm_stream_anthropic_bad_status(rag_service, anthropic_config):
+    """call_llm_stream() raises on non-200 from Anthropic."""
+    messages = [{"role": "user", "content": "Hi"}]
+    mock_resp = AsyncMock()
+    mock_resp.status_code = 401
+
+    stream_cm = MagicMock()
+    stream_cm.__aenter__ = AsyncMock(return_value=mock_resp)
+    stream_cm.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("app.services.rag_service.httpx.AsyncClient") as MockClient:
+        mock_client = MagicMock()
+        mock_client.stream = MagicMock(return_value=stream_cm)
+        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        with pytest.raises(RuntimeError, match="LLM returned status 401"):
+            async for _ in rag_service.call_llm_stream(messages, anthropic_config):
+                pass
+
+
+# ── Helper for async iteration in tests ─────────────────────
+
+
+async def _async_iter(items):
+    for item in items:
+        yield item

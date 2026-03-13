@@ -79,7 +79,7 @@ Plan: ~/.claude/plans/zany-percolating-key.md
 
 ### 3C. Anthropic Claude Provider
 [x] Task 39: Config — add ANTHROPIC provider enum + default base_url
-[ ] Task 40: RAGService — Anthropic LLM call + stream (/v1/messages, x-api-key)
+[x] Task 40: RAGService — Anthropic LLM call + stream (/v1/messages, x-api-key)
 [ ] Task 41: test-llm — Anthropic connection test support
 [ ] Task 42: Frontend — Anthropic option in Settings page
 

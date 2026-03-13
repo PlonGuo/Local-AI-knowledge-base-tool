@@ -81,6 +81,40 @@ class RAGService:
             {"role": "user", "content": user_content},
         ]
 
+    # ── Anthropic helpers ─────────────────────────────────────
+
+    @staticmethod
+    def _prepare_anthropic(
+        messages: list[dict[str, str]], config: AppConfig
+    ) -> tuple[str, dict[str, str], dict]:
+        """Build Anthropic-specific URL, headers, and JSON body.
+
+        Extracts system message from the messages list into the top-level
+        ``system`` field required by the Anthropic Messages API.
+        """
+        url = f"{config.base_url.rstrip('/')}/v1/messages"
+        headers = {
+            "x-api-key": config.api_key or "",
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+        # Separate system message from user/assistant messages
+        system_text = None
+        api_messages = []
+        for m in messages:
+            if m["role"] == "system":
+                system_text = m["content"]
+            else:
+                api_messages.append(m)
+        body: dict = {
+            "model": config.model_name,
+            "max_tokens": 4096,
+            "messages": api_messages,
+        }
+        if system_text:
+            body["system"] = system_text
+        return url, headers, body
+
     # ── LLM call ──────────────────────────────────────────────
 
     async def call_llm(
@@ -99,6 +133,10 @@ class RAGService:
                             "stream": False,
                         },
                     )
+                elif config.llm_provider == LLMProvider.ANTHROPIC:
+                    url, headers, body = self._prepare_anthropic(messages, config)
+                    body["stream"] = False
+                    resp = await client.post(url, json=body, headers=headers)
                 else:
                     # OpenAI-compatible
                     url = f"{config.base_url.rstrip('/')}/chat/completions"
@@ -123,6 +161,8 @@ class RAGService:
                 data = resp.json()
                 if config.llm_provider == LLMProvider.OLLAMA:
                     return data["message"]["content"]
+                elif config.llm_provider == LLMProvider.ANTHROPIC:
+                    return data["content"][0]["text"]
                 else:
                     return data["choices"][0]["message"]["content"]
 
@@ -159,6 +199,27 @@ class RAGService:
                             content = data.get("message", {}).get("content", "")
                             if content:
                                 yield content
+                elif config.llm_provider == LLMProvider.ANTHROPIC:
+                    url, headers, body = self._prepare_anthropic(messages, config)
+                    body["stream"] = True
+                    async with client.stream(
+                        "POST", url, json=body, headers=headers,
+                    ) as resp:
+                        if resp.status_code != 200:
+                            raise RuntimeError(
+                                f"LLM returned status {resp.status_code}"
+                            )
+                        async for line in resp.aiter_lines():
+                            if not line or not line.startswith("data: "):
+                                continue
+                            payload = line[6:]
+                            data = json.loads(payload)
+                            if data.get("type") == "content_block_delta":
+                                text = data.get("delta", {}).get("text", "")
+                                if text:
+                                    yield text
+                            elif data.get("type") == "message_stop":
+                                break
                 else:
                     # OpenAI-compatible SSE
                     url = f"{config.base_url.rstrip('/')}/chat/completions"
