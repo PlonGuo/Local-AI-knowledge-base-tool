@@ -89,7 +89,7 @@ Plan: ~/.claude/plans/zany-percolating-key.md
 [x] Task 45: Wire FileTree click to editor view
 
 ### 3E. File Watcher
-[ ] Task 46: watchdog dependency + FileWatcher service (debounce, extension filter)
+[x] Task 46: watchdog dependency + FileWatcher service (debounce, extension filter)
 [ ] Task 47: FileWatcher + IngestService integration (async bridge)
 [ ] Task 48: Lifespan integration + watcher API (GET /watcher/status, POST /watcher/toggle)
 [ ] Task 49: Frontend watcher status indicator in StatusBar
@@ -146,3 +146,4 @@ Plan: ~/.claude/plans/zany-percolating-key.md
 2026-03-13 — Task 43 complete: PUT /knowledge/file/content endpoint — SaveContentRequest model (path, content), path traversal protection, disk write + re-ingest via IngestService.ingest_file(); 10 new tests (200, response body, disk write, nested, 404, traversal, absolute, directory blocked, re-ingest Chroma, DB update); all 50 knowledge tests pass.
 2026-03-13 — Task 44 complete: MarkdownEditor component with textarea editor, Save (PUT /knowledge/file/content) and Cancel buttons, loading/error/saved feedback states, filename header display, content refetch on filePath change; 11 new tests; all 121 frontend tests pass; tsc clean.
 2026-03-13 — Task 45 complete: Wired FileTree click to MarkdownEditor view — AppLayout gains 'editor' view state + selectedFilePath, Sidebar passes onFileSelect/selectedPath, clicking file opens editor, Cancel returns to chat, settings still accessible; 7 new tests; all 128 frontend tests pass; tsc clean.
+2026-03-13 — Task 46 complete: Added watchdog>=4.0.0 to pyproject.toml; app/services/file_watcher.py with FileWatcher class — watchdog Observer, _DebouncedHandler (threading.Timer debounce, extension filter, asyncio bridge), start/stop/status, case-insensitive extension matching; 19 new tests (init, extension filter, start/stop, debounce coalescing, ignore non-watched, detect new/delete, status); all 19 pass.
