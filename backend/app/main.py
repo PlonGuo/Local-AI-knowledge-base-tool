@@ -162,6 +162,22 @@ def create_app(
     return app
 
 
+def _resolve_data_paths(data_dir: Optional[str]) -> dict:
+    """Return create_app() kwargs derived from a single data directory.
+
+    Returns an empty dict when data_dir is None (dev mode uses CWD defaults).
+    """
+    if data_dir is None:
+        return {}
+    d = Path(data_dir)
+    return {
+        "config_path": d / "config.yaml",
+        "db_path": str(d / "knowhive.db"),
+        "chroma_path": str(d / "chroma_data"),
+        "knowledge_dir": str(d / "knowledge"),
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="KnowHive backend sidecar")
     parser.add_argument(
@@ -170,16 +186,27 @@ def main() -> None:
         default=18234,
         help="Port to listen on (default: 18234)",
     )
+    parser.add_argument(
+        "--data-dir",
+        type=str,
+        default=None,
+        help="Directory for user data (db, chroma, knowledge, config). Defaults to CWD.",
+    )
     args = parser.parse_args()
 
     setup_logging()
 
+    path_kwargs = _resolve_data_paths(args.data_dir)
     uvicorn.run(
-        create_app(),
+        create_app(**path_kwargs),
         host="127.0.0.1",
         port=args.port,
         log_level="info",
     )
+
+
+# Module-level app instance for `uvicorn app.main:app --reload` (dev:all mode)
+app = create_app()
 
 
 if __name__ == "__main__":

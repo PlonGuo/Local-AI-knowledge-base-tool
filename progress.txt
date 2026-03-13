@@ -138,6 +138,27 @@ Plan: ~/.claude/plans/zany-percolating-key.md
 [x] Task 75: Review page + AI summaries integration (Show AI Summary button)
 [x] Task 76: Knowledge overview with summaries (document list + summaries)
 
+## Phase 5: 打包发布 + Onboarding + 文档
+Plan: ~/.claude/plans/tender-hatching-hopcroft.md
+
+### 5A. Packaging Fix
+[x] Task 77: Backend main.py — add --data-dir CLI arg; derive all data paths from it
+[ ] Task 78: Electron sidecar.ts — fix packaged backend dir resolution + pass --data-dir
+[ ] Task 79: electron-builder.yml + package.json — include backend/ via extraResources + asarUnpack + add build scripts
+[ ] Task 80: Electron IPC — check-setup handler (uv --version probe) + preload.ts checkSetup()
+[ ] Task 81: Backend GET /setup/status endpoint (python_ok, uv_ok, ollama_ok, first_run)
+
+### 5B. Onboarding Flow
+[ ] Task 82: Backend AppConfig.first_run_complete field + POST /setup/complete endpoint
+[ ] Task 83: Frontend OnboardingPage Step 1 — dependency check UI
+[ ] Task 84: Frontend OnboardingPage Step 2 — LLM configuration
+[ ] Task 85: Frontend OnboardingPage Step 3 — ready + POST /setup/complete call
+[ ] Task 86: Wire OnboardingPage into App.tsx + AppLayout.tsx
+
+### 5C. Documentation
+[ ] Task 87: README.md rewrite (features, prerequisites, installation, dev setup)
+[ ] Task 88: CONTRIBUTING.md (dev setup, test commands, contribution guide)
+
 === LOG ===
 2026-03-12 — Task 18 complete: Added langchain-core, langchain-community, langchain-text-splitters, chromadb, sentence-transformers, aiosqlite, pyyaml, pytest-asyncio to pyproject.toml; uv sync installs 93 new packages; 7 new import tests; all 21 tests pass.
 2026-03-12 — Task 19 complete: app/database.py with async SQLite connection manager (aiosqlite), 3 tables (documents, chat_messages, ingest_tasks) matching PRD schema; app/models.py with Pydantic models + StrEnum types; 18 database tests; all 39 tests pass.
