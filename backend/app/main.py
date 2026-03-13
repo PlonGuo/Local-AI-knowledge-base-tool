@@ -9,6 +9,8 @@ import argparse
 import uvicorn
 from fastapi import FastAPI
 
+from app.logging_config import setup_logging
+
 APP_VERSION = "0.1.0"
 
 
@@ -31,6 +33,8 @@ def main() -> None:
         help="Port to listen on (default: 18234)",
     )
     args = parser.parse_args()
+
+    setup_logging()
 
     uvicorn.run(
         create_app(),

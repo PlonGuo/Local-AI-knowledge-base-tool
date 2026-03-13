@@ -20,7 +20,7 @@ Plan: v1.1 (~/.claude/plans/lovely-knitting-hopper.md)
 ### 1B. FastAPI Backend
 [x] Task 6: FastAPI entry point with CLI --port arg + 127.0.0.1 binding
 [x] Task 7: GET /health endpoint (with unit tests)
-[ ] Task 8: File-based logging (logs/backend.log, daily rotation, 7-day retention)
+[x] Task 8: File-based logging (logs/backend.log, daily rotation, 7-day retention)
 
 ### 1C. Electron Main Process
 [ ] Task 9: Electron main process + BrowserWindow
@@ -43,3 +43,4 @@ Plan: v1.1 (~/.claude/plans/lovely-knitting-hopper.md)
 2026-03-12 — Phase 0 complete: Tasks 1-3 done. GitHub repo renamed to knowhive, remote updated, PRD aligned with v1.1.
 2026-03-12 — Task 5 complete: backend scaffold created. pyproject.toml with FastAPI 0.135.1, uvicorn, pydantic; uv sync passes; 3 import tests pass.
 2026-03-12 — Tasks 6+7 complete: app/main.py with create_app(), --port CLI arg, 127.0.0.1 binding, GET /health → {"status":"ok","version":"0.1.0"}; 4 tests pass; curl smoke test passes.
+2026-03-12 — Task 8 complete: app/logging_config.py with TimedRotatingFileHandler (midnight rotation, 7-day retention), uvicorn log routing; 7 logging tests pass; backend/logs/ in .gitignore.
