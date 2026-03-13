@@ -219,6 +219,31 @@ describe('Import Flow', () => {
     }, { timeout: 3000 })
   })
 
+  it('handles PDF file imports alongside Markdown', async () => {
+    setupWindowApi(['/path/to/doc.md', '/path/to/report.pdf'])
+    setupFetchMock({
+      '/ingest/files': { task_id: 'task-pdf', status: 'pending', total_files: 2 },
+      '/ingest/status/task-pdf': { task_id: 'task-pdf', status: 'completed', total_files: 2, processed_files: 2, errors: null },
+    })
+
+    render(<Sidebar backendUrl={mockBackendUrl} />)
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('import-button'))
+    })
+
+    // Verify ingest API was called with both .md and .pdf paths
+    const ingestCall = fetchMock.mock.calls.find(
+      (call: unknown[]) => typeof call[0] === 'string' && (call[0] as string).includes('/ingest/files')
+    )
+    expect(ingestCall).toBeDefined()
+    const body = JSON.parse((ingestCall![1] as RequestInit).body as string)
+    expect(body.file_paths).toEqual(['/path/to/doc.md', '/path/to/report.pdf'])
+
+    await waitFor(() => {
+      expect(screen.getByTestId('import-status-text')).toHaveTextContent('Import complete!')
+    }, { timeout: 3000 })
+  })
+
   it('refreshes file tree after successful import', async () => {
     setupWindowApi(['/path/to/file.md'])
     setupFetchMock({

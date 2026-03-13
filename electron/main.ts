@@ -34,7 +34,7 @@ function registerIpcHandlers(): void {
     const win = BrowserWindow.getFocusedWindow()
     const result = await dialog.showOpenDialog(win!, {
       properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'Markdown', extensions: ['md'] }],
+      filters: [{ name: 'Documents', extensions: ['md', 'pdf'] }],
     })
     return result.canceled ? [] : result.filePaths
   })

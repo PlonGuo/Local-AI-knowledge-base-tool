@@ -22,13 +22,32 @@ async def db():
 
 @pytest.fixture
 def knowledge_dir(tmp_path):
-    """Create a temporary knowledge directory with sample Markdown files."""
+    """Create a temporary knowledge directory with sample Markdown and PDF files."""
     md1 = tmp_path / "hello.md"
     md1.write_text("# Hello World\n\nThis is a test document.\n")
 
     md2 = tmp_path / "subdir" / "nested.md"
     md2.parent.mkdir()
     md2.write_text("# Nested\n\nA nested markdown file.\n")
+
+    return tmp_path
+
+
+@pytest.fixture
+def knowledge_dir_with_pdf(tmp_path):
+    """Create a knowledge directory with both Markdown and PDF files."""
+    import fitz  # PyMuPDF
+
+    md1 = tmp_path / "hello.md"
+    md1.write_text("# Hello World\n\nThis is a test document.\n")
+
+    # Create a minimal valid PDF
+    pdf_path = tmp_path / "report.pdf"
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "PDF report content for testing.")
+    doc.save(str(pdf_path))
+    doc.close()
 
     return tmp_path
 
@@ -212,3 +231,57 @@ async def test_ingest_creates_task_record(client, db, knowledge_dir):
     assert row["status"] == "completed"
     assert row["total_files"] == 1
     assert row["processed_files"] == 1
+
+
+# ── PDF support ───────────────────────────────────────────────────
+
+
+@pytest.fixture
+def app_with_pdf(db, chroma_dir, knowledge_dir_with_pdf, tmp_path):
+    """Create a FastAPI test app with a knowledge dir containing PDFs."""
+    config_path = tmp_path / "config.yaml"
+    application = create_app(config_path=config_path)
+
+    from app.routers.ingest import init_ingest_router
+
+    init_ingest_router(
+        chroma_path=str(chroma_dir),
+        knowledge_dir=str(knowledge_dir_with_pdf),
+    )
+
+    return application
+
+
+@pytest.fixture
+def client_with_pdf(app_with_pdf):
+    return TestClient(app_with_pdf)
+
+
+def test_resync_includes_pdf_files(client_with_pdf, knowledge_dir_with_pdf):
+    """POST /ingest/resync should discover and ingest both .md and .pdf files."""
+    resp = client_with_pdf.post("/ingest/resync")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total_files"] == 2  # 1 .md + 1 .pdf
+
+    task_id = data["task_id"]
+    status_resp = client_with_pdf.get(f"/ingest/status/{task_id}")
+    status_data = status_resp.json()
+    assert status_data["status"] == "completed"
+    assert status_data["processed_files"] == 2
+
+
+def test_ingest_pdf_file_via_api(client_with_pdf, knowledge_dir_with_pdf):
+    """POST /ingest/files with a PDF path should ingest it successfully."""
+    pdf_path = str(knowledge_dir_with_pdf / "report.pdf")
+    resp = client_with_pdf.post(
+        "/ingest/files",
+        json={"file_paths": [pdf_path]},
+    )
+    assert resp.status_code == 200
+    task_id = resp.json()["task_id"]
+
+    status_resp = client_with_pdf.get(f"/ingest/status/{task_id}")
+    data = status_resp.json()
+    assert data["status"] == "completed"
+    assert data["processed_files"] == 1
