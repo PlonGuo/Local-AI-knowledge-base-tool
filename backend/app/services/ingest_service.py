@@ -23,11 +23,17 @@ CHUNK_OVERLAP = 200
 class IngestService:
     """Handles Markdown ingestion: load → split → embed → Chroma store with dedup."""
 
-    def __init__(self, chroma_path: str = "./chroma_data", collection_name: str = "knowhive"):
+    def __init__(
+        self,
+        chroma_path: str = "./chroma_data",
+        collection_name: str = "knowhive",
+        embedding_function: Optional[Any] = None,
+    ):
         self._client = chromadb.PersistentClient(path=chroma_path)
-        self._collection = self._client.get_or_create_collection(
-            name=collection_name,
-        )
+        create_kwargs: dict[str, Any] = {"name": collection_name}
+        if embedding_function is not None:
+            create_kwargs["embedding_function"] = embedding_function
+        self._collection = self._client.get_or_create_collection(**create_kwargs)
         self._splitter = RecursiveCharacterTextSplitter(
             chunk_size=CHUNK_SIZE,
             chunk_overlap=CHUNK_OVERLAP,

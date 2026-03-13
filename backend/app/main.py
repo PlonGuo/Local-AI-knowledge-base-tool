@@ -23,8 +23,11 @@ from app.routers.ingest import init_ingest_router
 from app.routers.ingest import router as ingest_router
 from app.routers.knowledge import init_knowledge_router
 from app.routers.knowledge import router as knowledge_router
+from app.routers.embedding import init_embedding_router
+from app.routers.embedding import router as embedding_router
 from app.routers.watcher import init_watcher_router
 from app.routers.watcher import router as watcher_router
+from app.services.embedding_service import EmbeddingService
 from app.services.ingest_service import IngestService
 from app.services.rag_service import RAGService
 from app.services.sync_service import SyncService
@@ -57,8 +60,15 @@ def create_app(
         logger.info("Initializing database at %s", _db_path)
         await init_db(_db_path)
 
+        # Initialize embedding service + get embedding function for current config
+        from app.config import load_config
+        current_config = load_config(_config_path)
+        embedding_service = EmbeddingService()
+        init_embedding_router(embedding_service)
+        embedding_fn = embedding_service.get_embedding_function(current_config.embedding_language)
+
         # Initialize services
-        ingest_service = IngestService(chroma_path=_chroma_path)
+        ingest_service = IngestService(chroma_path=_chroma_path, embedding_function=embedding_fn)
         rag_service = RAGService(collection=ingest_service.collection)
 
         # Initialize routers with dependencies
@@ -104,6 +114,7 @@ def create_app(
     app.include_router(knowledge_router)
     app.include_router(chat_router)
     app.include_router(watcher_router)
+    app.include_router(embedding_router)
 
     @app.get("/health")
     def health() -> dict:
