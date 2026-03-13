@@ -5,28 +5,87 @@ Usage:
     uv run python -m app.main --port 18234
 """
 import argparse
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
 import uvicorn
 from fastapi import FastAPI
 
+from app.database import close_db, init_db
 from app.logging_config import setup_logging
+from app.routers.chat import init_chat_router
 from app.routers.chat import router as chat_router
 from app.routers.config import init_config_router
 from app.routers.config import router as config_router
+from app.routers.ingest import init_ingest_router
 from app.routers.ingest import router as ingest_router
+from app.routers.knowledge import init_knowledge_router
 from app.routers.knowledge import router as knowledge_router
+from app.services.ingest_service import IngestService
+from app.services.rag_service import RAGService
+from app.services.sync_service import SyncService
+
+logger = logging.getLogger(__name__)
 
 APP_VERSION = "0.1.0"
 
 DEFAULT_CONFIG_PATH = Path.home() / "Library" / "Application Support" / "knowhive" / "config.yaml"
+DEFAULT_DB_PATH = "knowhive.db"
+DEFAULT_CHROMA_PATH = "./chroma_data"
+DEFAULT_KNOWLEDGE_DIR = "./knowledge"
 
 
-def create_app(config_path: Optional[Path] = None) -> FastAPI:
-    app = FastAPI(title="KnowHive Backend", version=APP_VERSION)
+def create_app(
+    config_path: Optional[Path] = None,
+    db_path: Optional[str] = None,
+    chroma_path: Optional[str] = None,
+    knowledge_dir: Optional[str] = None,
+) -> FastAPI:
+    _config_path = config_path or DEFAULT_CONFIG_PATH
+    _db_path = db_path or DEFAULT_DB_PATH
+    _chroma_path = chroma_path or DEFAULT_CHROMA_PATH
+    _knowledge_dir = knowledge_dir or DEFAULT_KNOWLEDGE_DIR
 
-    init_config_router(config_path or DEFAULT_CONFIG_PATH)
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        # ── Startup ──────────────────────────────────────────
+        logger.info("Initializing database at %s", _db_path)
+        await init_db(_db_path)
+
+        # Initialize services
+        ingest_service = IngestService(chroma_path=_chroma_path)
+        rag_service = RAGService(collection=ingest_service.collection)
+
+        # Initialize routers with dependencies
+        init_config_router(_config_path)
+        init_ingest_router(chroma_path=_chroma_path, knowledge_dir=_knowledge_dir)
+        init_knowledge_router(knowledge_dir=_knowledge_dir)
+        init_chat_router(rag_service=rag_service, config_path=_config_path)
+
+        # Run startup sync
+        knowledge_path = Path(_knowledge_dir)
+        if knowledge_path.exists():
+            sync_service = SyncService(ingest_service, knowledge_path)
+            try:
+                stats = await sync_service.sync()
+                logger.info(
+                    "Startup sync: %d new, %d modified, %d deleted",
+                    stats["new"], stats["modified"], stats["deleted"],
+                )
+            except Exception:
+                logger.exception("Startup sync failed")
+
+        logger.info("KnowHive backend ready")
+        yield
+
+        # ── Shutdown ─────────────────────────────────────────
+        await close_db()
+        logger.info("KnowHive backend shut down")
+
+    app = FastAPI(title="KnowHive Backend", version=APP_VERSION, lifespan=lifespan)
+
     app.include_router(config_router)
     app.include_router(ingest_router)
     app.include_router(knowledge_router)

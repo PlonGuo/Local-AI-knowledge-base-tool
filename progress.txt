@@ -62,7 +62,7 @@ Plan: v1.1 (~/.claude/plans/lovely-knitting-hopper.md)
 [x] Task 31: Import flow (file picker, ingest API, progress bar)
 
 ### 2E. Integration
-[ ] Task 32: End-to-end wiring (IPC bridge updates, startup sync, full flow)
+[x] Task 32: End-to-end wiring (IPC bridge updates, startup sync, full flow)
 
 === LOG ===
 2026-03-12 — Task 18 complete: Added langchain-core, langchain-community, langchain-text-splitters, chromadb, sentence-transformers, aiosqlite, pyyaml, pytest-asyncio to pyproject.toml; uv sync installs 93 new packages; 7 new import tests; all 21 tests pass.
@@ -96,3 +96,4 @@ Plan: v1.1 (~/.claude/plans/lovely-knitting-hopper.md)
 2026-03-13 — Task 30 complete: ChatArea component with message list (user/assistant styling, whitespace-pre-wrap), textarea input (Enter send, Shift+Enter newline), SSE streaming (ReadableStream reader, token/sources/done/error events), source citations (badge display), chat history load (GET /chat/history), clear history (DELETE /chat/history); AppLayout passes backendUrl to ChatArea; defensive null check on history response; 16 new chat tests; all 85 tests pass; tsc clean.
 2026-03-13 — Task 29 complete: FileTree component with collapsible tree (fetches GET /knowledge/tree, expand/collapse dirs, file selection, selected highlight, refresh callback, error/empty states); Sidebar updated with FileTree integration + Import button (triggers IPC selectFiles → POST /ingest/files); AppLayout passes backendUrl to Sidebar; env.d.ts updated with selectFiles IPC type; 14 new tests (9 filetree + 5 sidebar-filetree); all 69 tests pass; tsc clean.
 2026-03-13 — Task 31 complete: Import flow with file picker (selectFiles IPC via Electron dialog.showOpenDialog), POST /ingest/files call, progress bar with status polling (GET /ingest/status/{id} at 500ms intervals), completion detection, file tree auto-refresh, error display; preload.ts + main.ts updated with select-files IPC handler; Sidebar refactored with ImportState tracking; 10 new import-flow tests; all 95 frontend tests pass; tsc clean.
+2026-03-13 — Task 32 complete: FastAPI lifespan in main.py wires all services end-to-end — init_db() creates tables, IngestService + RAGService instantiated, all router init_*() functions called with dependencies, SyncService.sync() runs on startup (ingests existing knowledge/ files), close_db() on shutdown; create_app() accepts db_path/chroma_path/knowledge_dir params for testability; 14 new e2e wiring tests; all 150 backend + 95 frontend tests pass; tsc clean.
