@@ -25,11 +25,14 @@ from app.routers.knowledge import init_knowledge_router
 from app.routers.knowledge import router as knowledge_router
 from app.routers.embedding import init_embedding_router
 from app.routers.embedding import router as embedding_router
+from app.routers.community import init_community_router
+from app.routers.community import router as community_router
 from app.routers.export import init_export_router
 from app.routers.export import router as export_router
 from app.routers.watcher import init_watcher_router
 from app.routers.watcher import router as watcher_router
 from app.services.embedding_service import EmbeddingService
+from app.services.community_service import CommunityService
 from app.services.export_service import ExportService
 from app.services.ingest_service import IngestService
 from app.services.rag_service import RAGService
@@ -91,6 +94,10 @@ def create_app(
         )
         init_export_router(export_service, knowledge_dir=Path(_knowledge_dir))
 
+        # Initialize community service
+        community_service = CommunityService(knowledge_dir=Path(_knowledge_dir))
+        init_community_router(community_service, knowledge_dir=Path(_knowledge_dir))
+
         # Run startup sync + start file watcher
         knowledge_path = Path(_knowledge_dir)
         watcher_bridge = None
@@ -130,6 +137,7 @@ def create_app(
     app.include_router(watcher_router)
     app.include_router(embedding_router)
     app.include_router(export_router)
+    app.include_router(community_router)
 
     @app.get("/health")
     def health() -> dict:

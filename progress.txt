@@ -122,7 +122,7 @@ Plan: ~/.claude/plans/zany-percolating-key.md
 ### 4B. Community Content
 [x] Task 60: Community manifest schema + fetch service (httpx, cache TTL)
 [x] Task 61: Community import service (download pack to knowledge/)
-[ ] Task 62: Community API router (GET /community/packs, POST /community/import)
+[x] Task 62: Community API router (GET /community/packs, POST /community/import)
 [ ] Task 63: Frontend community browser (pack cards, import, search/filter)
 
 ### 4D. Spaced Repetition
