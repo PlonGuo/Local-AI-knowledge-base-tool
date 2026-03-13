@@ -61,7 +61,7 @@ def create_app(
         # Initialize routers with dependencies
         init_config_router(_config_path)
         init_ingest_router(chroma_path=_chroma_path, knowledge_dir=_knowledge_dir)
-        init_knowledge_router(knowledge_dir=_knowledge_dir)
+        init_knowledge_router(knowledge_dir=_knowledge_dir, ingest_service=ingest_service)
         init_chat_router(rag_service=rag_service, config_path=_config_path)
 
         # Run startup sync

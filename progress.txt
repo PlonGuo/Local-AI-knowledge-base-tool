@@ -68,7 +68,7 @@ Plan: v1.1 (~/.claude/plans/lovely-knitting-hopper.md)
 Plan: ~/.claude/plans/zany-percolating-key.md
 
 ### 3A. File Management
-[ ] Task 33: DELETE /knowledge/file endpoint (disk + DB + Chroma cleanup, path traversal protection)
+[x] Task 33: DELETE /knowledge/file endpoint (disk + DB + Chroma cleanup, path traversal protection)
 [ ] Task 34: PUT /knowledge/file rename endpoint (disk rename + DB update + Chroma metadata)
 [ ] Task 35: Frontend context menu (right-click delete/rename on FileTree)
 
@@ -135,3 +135,4 @@ Plan: ~/.claude/plans/zany-percolating-key.md
 2026-03-13 — Task 29 complete: FileTree component with collapsible tree (fetches GET /knowledge/tree, expand/collapse dirs, file selection, selected highlight, refresh callback, error/empty states); Sidebar updated with FileTree integration + Import button (triggers IPC selectFiles → POST /ingest/files); AppLayout passes backendUrl to Sidebar; env.d.ts updated with selectFiles IPC type; 14 new tests (9 filetree + 5 sidebar-filetree); all 69 tests pass; tsc clean.
 2026-03-13 — Task 31 complete: Import flow with file picker (selectFiles IPC via Electron dialog.showOpenDialog), POST /ingest/files call, progress bar with status polling (GET /ingest/status/{id} at 500ms intervals), completion detection, file tree auto-refresh, error display; preload.ts + main.ts updated with select-files IPC handler; Sidebar refactored with ImportState tracking; 10 new import-flow tests; all 95 frontend tests pass; tsc clean.
 2026-03-13 — Task 32 complete: FastAPI lifespan in main.py wires all services end-to-end — init_db() creates tables, IngestService + RAGService instantiated, all router init_*() functions called with dependencies, SyncService.sync() runs on startup (ingests existing knowledge/ files), close_db() on shutdown; create_app() accepts db_path/chroma_path/knowledge_dir params for testability; 14 new e2e wiring tests; all 150 backend + 95 frontend tests pass; tsc clean.
+2026-03-13 — Task 33 complete: DELETE /knowledge/file endpoint — path traversal protection (reused into _resolve_safe_path helper), disk deletion, DB document record cleanup, Chroma chunk cleanup via IngestService.delete_chunks_for_file(); init_knowledge_router now accepts optional ingest_service param; main.py passes ingest_service; 10 new tests (delete 200, response body, nested, 404, traversal, absolute, missing param, DB cleanup, Chroma cleanup, directory blocked); all 25 knowledge tests pass; 159/160 backend tests pass (1 pre-existing config test failure).

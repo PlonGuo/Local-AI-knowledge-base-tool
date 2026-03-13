@@ -1,21 +1,29 @@
-"""Knowledge API endpoints — GET /knowledge/tree, GET /knowledge/file."""
+"""Knowledge API endpoints — GET /knowledge/tree, GET /knowledge/file, DELETE /knowledge/file."""
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from fastapi import APIRouter, HTTPException, Query
+
+if TYPE_CHECKING:
+    from app.services.ingest_service import IngestService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 _knowledge_dir: Optional[str] = None
+_ingest_service: Optional["IngestService"] = None
 
 
-def init_knowledge_router(knowledge_dir: str = "./knowledge") -> None:
-    """Initialize knowledge router with the knowledge directory path."""
-    global _knowledge_dir
+def init_knowledge_router(
+    knowledge_dir: str = "./knowledge",
+    ingest_service: Optional["IngestService"] = None,
+) -> None:
+    """Initialize knowledge router with the knowledge directory path and optional ingest service."""
+    global _knowledge_dir, _ingest_service
     _knowledge_dir = knowledge_dir
+    _ingest_service = ingest_service
 
 
 def _get_knowledge_path() -> Path:
@@ -68,21 +76,26 @@ def knowledge_tree() -> dict:
     return tree
 
 
-@router.get("/knowledge/file")
-def knowledge_file(path: str = Query(..., description="Relative path within knowledge dir")) -> dict:
-    """Return the content of a file in the knowledge directory (read-only)."""
-    # Block absolute paths
+def _resolve_safe_path(path: str) -> Path:
+    """Resolve a relative path within the knowledge dir, blocking traversal and absolute paths."""
     if path.startswith("/"):
         raise HTTPException(status_code=400, detail="Absolute paths are not allowed")
 
     root = _get_knowledge_path()
     resolved = (root / path).resolve()
 
-    # Block path traversal
     try:
         resolved.relative_to(root.resolve())
     except ValueError:
         raise HTTPException(status_code=400, detail="Path traversal is not allowed")
+
+    return resolved
+
+
+@router.get("/knowledge/file")
+def knowledge_file(path: str = Query(..., description="Relative path within knowledge dir")) -> dict:
+    """Return the content of a file in the knowledge directory (read-only)."""
+    resolved = _resolve_safe_path(path)
 
     if not resolved.exists() or not resolved.is_file():
         raise HTTPException(status_code=404, detail="File not found")
@@ -97,3 +110,40 @@ def knowledge_file(path: str = Query(..., description="Relative path within know
         "path": path,
         "content": content,
     }
+
+
+@router.delete("/knowledge/file")
+async def delete_knowledge_file(
+    path: str = Query(..., description="Relative path within knowledge dir"),
+) -> dict:
+    """Delete a file from the knowledge directory, DB, and Chroma."""
+    resolved = _resolve_safe_path(path)
+
+    if resolved.exists() and resolved.is_dir():
+        raise HTTPException(status_code=400, detail="Cannot delete directories")
+
+    if not resolved.exists() or not resolved.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    file_path_str = str(resolved)
+
+    # Clean up Chroma chunks
+    if _ingest_service is not None:
+        _ingest_service.delete_chunks_for_file(file_path_str)
+
+    # Clean up DB record
+    try:
+        from app.database import get_db
+
+        async with get_db() as db:
+            await db.execute("DELETE FROM documents WHERE file_path = ?", (file_path_str,))
+            await db.commit()
+    except RuntimeError:
+        # DB not initialized (e.g., in minimal test setups) — skip
+        pass
+
+    # Delete from disk
+    resolved.unlink()
+    logger.info("Deleted knowledge file: %s", path)
+
+    return {"path": path, "status": "deleted"}

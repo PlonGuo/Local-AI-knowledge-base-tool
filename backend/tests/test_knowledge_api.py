@@ -1,12 +1,13 @@
-"""Tests for knowledge API endpoints — GET /knowledge/tree, GET /knowledge/file."""
+"""Tests for knowledge API endpoints — GET /knowledge/tree, GET /knowledge/file, DELETE /knowledge/file."""
 from pathlib import Path
 
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
 
-from app.database import close_db, init_db
+from app.database import close_db, get_db, init_db
 from app.main import create_app
+from app.services.ingest_service import IngestService
 
 
 @pytest_asyncio.fixture
@@ -41,14 +42,28 @@ def knowledge_dir(tmp_path):
 
 
 @pytest.fixture
-def app(db, knowledge_dir, tmp_path):
+def chroma_dir(tmp_path):
+    """Temporary directory for Chroma data."""
+    p = tmp_path / "chroma_test"
+    p.mkdir()
+    return str(p)
+
+
+@pytest.fixture
+def ingest_service(chroma_dir):
+    """Create an IngestService for testing."""
+    return IngestService(chroma_path=chroma_dir)
+
+
+@pytest.fixture
+def app(db, knowledge_dir, chroma_dir, ingest_service, tmp_path):
     """Create a FastAPI test app with knowledge router configured."""
     config_path = tmp_path / "config.yaml"
     application = create_app(config_path=config_path)
 
     from app.routers.knowledge import init_knowledge_router
 
-    init_knowledge_router(knowledge_dir=str(knowledge_dir))
+    init_knowledge_router(knowledge_dir=str(knowledge_dir), ingest_service=ingest_service)
 
     return application
 
@@ -186,3 +201,100 @@ def test_file_returns_filename(client):
     data = resp.json()
     assert data["name"] == "readme.md"
     assert data["path"] == "readme.md"
+
+
+# ── DELETE /knowledge/file ────────────────────────────────────────
+
+
+def test_delete_file_returns_200(client, knowledge_dir):
+    """DELETE /knowledge/file should return 200 and remove the file from disk."""
+    assert (knowledge_dir / "readme.md").exists()
+    resp = client.delete("/knowledge/file", params={"path": "readme.md"})
+    assert resp.status_code == 200
+    assert not (knowledge_dir / "readme.md").exists()
+
+
+def test_delete_file_response_body(client):
+    """DELETE response should include path and status."""
+    resp = client.delete("/knowledge/file", params={"path": "readme.md"})
+    data = resp.json()
+    assert data["path"] == "readme.md"
+    assert data["status"] == "deleted"
+
+
+def test_delete_nested_file(client, knowledge_dir):
+    """DELETE should work for nested paths."""
+    resp = client.delete("/knowledge/file", params={"path": "guides/getting-started.md"})
+    assert resp.status_code == 200
+    assert not (knowledge_dir / "guides" / "getting-started.md").exists()
+
+
+def test_delete_not_found(client):
+    """DELETE for nonexistent file should return 404."""
+    resp = client.delete("/knowledge/file", params={"path": "nonexistent.md"})
+    assert resp.status_code == 404
+
+
+def test_delete_path_traversal_blocked(client):
+    """DELETE with path traversal should be blocked."""
+    resp = client.delete("/knowledge/file", params={"path": "../../../etc/passwd"})
+    assert resp.status_code == 400
+
+
+def test_delete_absolute_path_blocked(client):
+    """DELETE with absolute path should be blocked."""
+    resp = client.delete("/knowledge/file", params={"path": "/etc/passwd"})
+    assert resp.status_code == 400
+
+
+def test_delete_missing_path_param(client):
+    """DELETE without path param should return 422."""
+    resp = client.delete("/knowledge/file")
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_delete_cleans_up_db(client, knowledge_dir, ingest_service):
+    """DELETE should remove the document record from the database."""
+    file_path = knowledge_dir / "readme.md"
+    # Ingest the file first so it has a DB record
+    await ingest_service.ingest_file(file_path, knowledge_dir)
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT id FROM documents WHERE file_path = ?", (str(file_path),)
+        )
+        assert await cursor.fetchone() is not None
+
+    # Delete via API
+    resp = client.delete("/knowledge/file", params={"path": "readme.md"})
+    assert resp.status_code == 200
+
+    # DB record should be gone
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT id FROM documents WHERE file_path = ?", (str(file_path),)
+        )
+        assert await cursor.fetchone() is None
+
+
+@pytest.mark.asyncio
+async def test_delete_cleans_up_chroma(client, knowledge_dir, ingest_service):
+    """DELETE should remove chunks from Chroma."""
+    file_path = knowledge_dir / "readme.md"
+    await ingest_service.ingest_file(file_path, knowledge_dir)
+    # Verify chunks exist
+    results = ingest_service.collection.get(where={"file_path": str(file_path)})
+    assert len(results["ids"]) > 0
+
+    resp = client.delete("/knowledge/file", params={"path": "readme.md"})
+    assert resp.status_code == 200
+
+    # Chroma chunks should be gone
+    results = ingest_service.collection.get(where={"file_path": str(file_path)})
+    assert len(results["ids"]) == 0
+
+
+def test_delete_directory_blocked(client, knowledge_dir):
+    """DELETE should not allow deleting directories."""
+    resp = client.delete("/knowledge/file", params={"path": "guides"})
+    assert resp.status_code == 400
