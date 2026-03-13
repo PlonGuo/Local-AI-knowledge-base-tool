@@ -17,6 +17,7 @@ from app.config import (
     save_config,
 )
 from app.main import create_app
+from app.routers.config import init_config_router
 
 
 # ── Model tests ─────────────────────────────────────────────────
@@ -360,3 +361,104 @@ class TestTestLLMEndpoint:
         headers = call_kwargs.kwargs.get("headers", {}) if call_kwargs.kwargs else {}
         assert headers.get("x-api-key") == "sk-ant-test"
         assert "Authorization" not in headers
+        # Verify anthropic-version header is set
+        assert headers.get("anthropic-version") == "2023-06-01"
+
+    @patch("app.routers.config.httpx.AsyncClient")
+    def test_test_llm_anthropic_unauthorized(self, mock_client_cls, tmp_path: Path):
+        """Anthropic returns 401 for invalid API key."""
+        config_path = tmp_path / "config.yaml"
+        save_config(
+            AppConfig(
+                llm_provider=LLMProvider.ANTHROPIC,
+                base_url="https://api.anthropic.com",
+                model_name="claude-sonnet-4-20250514",
+                api_key="sk-ant-invalid",
+            ),
+            config_path,
+        )
+        app = create_app(config_path=config_path)
+        test_client = TestClient(app)
+
+        mock_response = AsyncMock()
+        mock_response.status_code = 401
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        mock_client_cls.return_value = mock_client
+
+        resp = test_client.post("/config/test-llm")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is False
+        assert "401" in data["error"]
+
+    @patch("app.routers.config.httpx.AsyncClient")
+    def test_test_llm_anthropic_no_api_key(self, mock_client_cls, tmp_path: Path):
+        """Anthropic test without API key still sends anthropic-version header."""
+        config_path = tmp_path / "config.yaml"
+        save_config(
+            AppConfig(
+                llm_provider=LLMProvider.ANTHROPIC,
+                base_url="https://api.anthropic.com",
+                model_name="claude-sonnet-4-20250514",
+            ),
+            config_path,
+        )
+        app = create_app(config_path=config_path)
+        # Explicitly set config_path to work around lifespan-based init
+        init_config_router(config_path)
+        test_client = TestClient(app)
+
+        mock_response = AsyncMock()
+        mock_response.status_code = 401
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        mock_client_cls.return_value = mock_client
+
+        resp = test_client.post("/config/test-llm")
+        assert resp.status_code == 200
+
+        # Verify anthropic-version is always sent, x-api-key is not
+        call_kwargs = mock_client.get.call_args
+        headers = call_kwargs.kwargs.get("headers", {}) if call_kwargs.kwargs else {}
+        assert headers.get("anthropic-version") == "2023-06-01"
+        assert "x-api-key" not in headers
+
+    @patch("app.routers.config.httpx.AsyncClient")
+    def test_test_llm_anthropic_connection_error(self, mock_client_cls, tmp_path: Path):
+        """Anthropic connection failure returns proper error."""
+        import httpx
+
+        config_path = tmp_path / "config.yaml"
+        save_config(
+            AppConfig(
+                llm_provider=LLMProvider.ANTHROPIC,
+                base_url="https://api.anthropic.com",
+                model_name="claude-sonnet-4-20250514",
+                api_key="sk-ant-test",
+            ),
+            config_path,
+        )
+        app = create_app(config_path=config_path)
+        test_client = TestClient(app)
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
+
+        mock_client_cls.return_value = mock_client
+
+        resp = test_client.post("/config/test-llm")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is False
+        assert "Connection failed" in data["error"]

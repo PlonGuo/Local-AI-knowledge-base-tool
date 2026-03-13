@@ -40,7 +40,7 @@ async def test_llm_endpoint() -> dict:
                 resp = await client.get(url)
             elif cfg.llm_provider == LLMProvider.ANTHROPIC:
                 url = f"{cfg.base_url.rstrip('/')}/v1/models"
-                headers = {}
+                headers = {"anthropic-version": "2023-06-01"}
                 if cfg.api_key:
                     headers["x-api-key"] = cfg.api_key
                 resp = await client.get(url, headers=headers)
