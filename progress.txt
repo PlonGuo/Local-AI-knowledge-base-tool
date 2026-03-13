@@ -136,7 +136,7 @@ Plan: ~/.claude/plans/zany-percolating-key.md
 [x] Task 73: Summary generation service (LLM summarization, DB caching)
 [x] Task 74: Summary DB table + API router (GET/POST /summary/file, /summary/topic, /summary/batch)
 [x] Task 75: Review page + AI summaries integration (Show AI Summary button)
-[ ] Task 76: Knowledge overview with summaries (document list + summaries)
+[x] Task 76: Knowledge overview with summaries (document list + summaries)
 
 === LOG ===
 2026-03-12 — Task 18 complete: Added langchain-core, langchain-community, langchain-text-splitters, chromadb, sentence-transformers, aiosqlite, pyyaml, pytest-asyncio to pyproject.toml; uv sync installs 93 new packages; 7 new import tests; all 21 tests pass.

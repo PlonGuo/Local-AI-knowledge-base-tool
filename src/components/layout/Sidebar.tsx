@@ -11,6 +11,7 @@ interface ImportState {
 interface SidebarProps {
   onSettingsClick?: () => void
   onCommunityClick?: () => void
+  onOverviewClick?: () => void
   backendUrl?: string
   onFileSelect?: (path: string) => void
   selectedPath?: string
@@ -20,6 +21,7 @@ interface SidebarProps {
 export default function Sidebar({
   onSettingsClick,
   onCommunityClick,
+  onOverviewClick,
   backendUrl,
   onFileSelect,
   selectedPath,
@@ -159,6 +161,13 @@ export default function Sidebar({
       </div>
 
       <div className="border-t p-2 flex flex-col gap-1">
+        <button
+          data-testid="overview-button"
+          onClick={onOverviewClick}
+          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+        >
+          Overview
+        </button>
         <button
           data-testid="community-button"
           onClick={onCommunityClick}

@@ -6,6 +6,7 @@ import SettingsPage from '../settings/SettingsPage'
 import MarkdownEditor from '../knowledge/MarkdownEditor'
 import CommunityBrowser from '../community/CommunityBrowser'
 import ReviewPage from '../review/ReviewPage'
+import KnowledgeOverview from '../knowledge/KnowledgeOverview'
 
 interface AppLayoutProps {
   health: { status: string; version: string } | null
@@ -14,7 +15,7 @@ interface AppLayoutProps {
 }
 
 export default function AppLayout({ health, error, backendUrl }: AppLayoutProps) {
-  const [view, setView] = useState<'chat' | 'settings' | 'editor' | 'community' | 'review'>('chat')
+  const [view, setView] = useState<'chat' | 'settings' | 'editor' | 'community' | 'review' | 'overview'>('chat')
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
   const [configVersion, setConfigVersion] = useState(0)
 
@@ -34,6 +35,7 @@ export default function AppLayout({ health, error, backendUrl }: AppLayoutProps)
         <Sidebar
           onSettingsClick={() => setView('settings')}
           onCommunityClick={() => setView('community')}
+          onOverviewClick={() => setView('overview')}
           onFileSelect={handleFileSelect}
           selectedPath={selectedFilePath ?? undefined}
           backendUrl={backendUrl}
@@ -44,6 +46,8 @@ export default function AppLayout({ health, error, backendUrl }: AppLayoutProps)
           <CommunityBrowser backendUrl={backendUrl} onBack={() => setView('chat')} />
         ) : view === 'review' ? (
           <ReviewPage backendUrl={backendUrl} onBack={() => setView('chat')} />
+        ) : view === 'overview' ? (
+          <KnowledgeOverview backendUrl={backendUrl} onBack={() => setView('chat')} />
         ) : view === 'editor' && selectedFilePath ? (
           <MarkdownEditor
             backendUrl={backendUrl}
