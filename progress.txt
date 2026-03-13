@@ -35,7 +35,7 @@ Plan: v1.1 (~/.claude/plans/lovely-knitting-hopper.md)
 ### 1E. Packaging
 [x] Task 15: electron-builder.yml configuration
 [x] Task 16: build-backend.sh script (python-build-standalone + uv sync)
-[ ] Task 17: Sidecar packaged mode (extraResources paths, .app size < 500MB)
+[x] Task 17: Sidecar packaged mode (extraResources paths, .app size < 500MB)
 
 === LOG ===
 2026-03-12 — Ralph loop initialized. Phase 0 + Phase 1 tasks defined.
@@ -52,3 +52,4 @@ Plan: v1.1 (~/.claude/plans/lovely-knitting-hopper.md)
 2026-03-12 — Task 14 complete: Fixed dev:all script to use electron-vite dev + standalone uvicorn with --reload; added BACKEND_URL env var support to main.ts (skips sidecar when set); wait-on ensures backend health before Electron starts; 10 new tests; all 19 tests pass; tsc clean.
 2026-03-12 — Task 15 complete: electron-builder.yml already configured with extraResources (python/ + backend/), macOS dmg target (arm64+x64), hardened runtime, entitlements; created build/entitlements.mac.plist with JIT, network, file access; 9 builder-config tests; pnpm build:dry validates successfully; all 33 tests pass.
 2026-03-12 — Task 16 complete: scripts/build-backend.sh downloads python-build-standalone 3.11.11, extracts to extraResources/python/, copies backend app + runs uv sync --no-dev into extraResources/backend/; platform detection (macOS/Linux, arm64/x64); 12 tests (structure + integration); all 45 tests pass.
+2026-03-12 — Task 17 complete: sidecar.ts updated for packaged mode — logs to userData (not asar), VIRTUAL_ENV+PYTHONPATH+PATH env vars for venv site-packages, cross-platform python path (win32 python.exe), 16 packaged-mode tests; all 49 tests pass; tsc clean.

@@ -102,7 +102,8 @@ export class SidecarManager {
 
     if (app.isPackaged) {
       // In packaged mode, use python from extraResources
-      return path.join(process.resourcesPath, 'python', 'bin', 'python3.11')
+      const binDir = process.platform === 'win32' ? 'python.exe' : path.join('bin', 'python3.11')
+      return path.join(process.resourcesPath, 'python', binDir)
     }
 
     // Dev mode: use uv run
@@ -127,8 +128,16 @@ export class SidecarManager {
     return ['-m', 'app.main', '--port', String(this._port)]
   }
 
+  private resolveLogsDir(): string {
+    if (app.isPackaged) {
+      // In packaged mode, write logs to userData (writable)
+      return path.join(app.getPath('userData'), 'logs')
+    }
+    return path.join(app.getAppPath(), 'logs')
+  }
+
   private ensureLogDir(): void {
-    const logsDir = path.join(app.getAppPath(), 'logs')
+    const logsDir = this.resolveLogsDir()
     if (!fs.existsSync(logsDir)) {
       fs.mkdirSync(logsDir, { recursive: true })
     }
@@ -136,6 +145,30 @@ export class SidecarManager {
       path.join(logsDir, 'electron.log'),
       { flags: 'a' }
     )
+  }
+
+  private buildSpawnEnv(): NodeJS.ProcessEnv {
+    const env = { ...process.env }
+
+    if (app.isPackaged) {
+      const backendDir = this.resolveBackendDir()
+      const venvDir = path.join(backendDir, '.venv')
+      env['VIRTUAL_ENV'] = venvDir
+
+      // Ensure the venv's site-packages are on PYTHONPATH so imports resolve
+      const sitePackages = process.platform === 'win32'
+        ? path.join(venvDir, 'Lib', 'site-packages')
+        : path.join(venvDir, 'lib', 'python3.11', 'site-packages')
+      env['PYTHONPATH'] = sitePackages
+
+      // Prepend venv bin to PATH
+      const venvBin = process.platform === 'win32'
+        ? path.join(venvDir, 'Scripts')
+        : path.join(venvDir, 'bin')
+      env['PATH'] = `${venvBin}${path.delimiter}${env['PATH'] ?? ''}`
+    }
+
+    return env
   }
 
   private async spawnProcess(): Promise<void> {
@@ -146,7 +179,7 @@ export class SidecarManager {
     this.proc = spawn(cmd, args, {
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env }
+      env: this.buildSpawnEnv()
     })
 
     // Pipe stdout/stderr to log file
