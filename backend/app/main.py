@@ -33,6 +33,8 @@ from app.routers.community import init_community_router
 from app.routers.community import router as community_router
 from app.routers.export import init_export_router
 from app.routers.export import router as export_router
+from app.routers.setup import init_setup_router
+from app.routers.setup import router as setup_router
 from app.routers.watcher import init_watcher_router
 from app.routers.watcher import router as watcher_router
 from app.services.embedding_service import EmbeddingService
@@ -84,6 +86,7 @@ def create_app(
         rag_service = RAGService(collection=ingest_service.collection)
 
         # Initialize routers with dependencies
+        init_setup_router(_config_path)
         init_config_router(_config_path)
         init_reembed_dependencies(
             ingest_service=ingest_service,
@@ -144,6 +147,7 @@ def create_app(
 
     app = FastAPI(title="KnowHive Backend", version=APP_VERSION, lifespan=lifespan)
 
+    app.include_router(setup_router)
     app.include_router(config_router)
     app.include_router(ingest_router)
     app.include_router(knowledge_router)
