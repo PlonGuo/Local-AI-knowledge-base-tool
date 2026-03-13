@@ -23,7 +23,7 @@ export default function AppLayout({ health, error, backendUrl }: AppLayoutProps)
         {view === 'settings' ? (
           <SettingsPage backendUrl={backendUrl} onBack={() => setView('chat')} />
         ) : (
-          <ChatArea />
+          <ChatArea backendUrl={backendUrl} />
         )}
       </div>
       <StatusBar health={health} error={error} />

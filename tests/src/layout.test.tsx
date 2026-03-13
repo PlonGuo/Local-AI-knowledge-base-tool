@@ -16,6 +16,7 @@ describe('AppLayout', () => {
       configurable: true
     })
     const sorted = Object.entries({
+      '/chat/history': { messages: [], total: 0 },
       '/health': { status: 'ok', version: '0.1.0' },
       '/knowledge/tree': { name: 'knowledge', path: '', type: 'directory', children: [] },
     }).sort((a, b) => b[0].length - a[0].length)
