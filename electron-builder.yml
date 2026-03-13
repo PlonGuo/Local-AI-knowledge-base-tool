@@ -11,6 +11,17 @@ files:
   - "!**/.DS_Store"
   - "!**/node_modules/.cache/**"
 
+extraResources:
+  - from: backend
+    to: app.unpacked/backend
+    filter:
+      - "**/*"
+      - "!**/__pycache__/**"
+      - "!**/.venv/**"
+      - "!**/chroma_data/**"
+      - "!**/knowhive.db"
+      - "!**/logs/**"
+
 mac:
   target:
     - target: dmg

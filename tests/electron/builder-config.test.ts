@@ -10,6 +10,11 @@ function loadConfig() {
   return parse(raw)
 }
 
+function loadPackageJson() {
+  const raw = readFileSync(resolve(ROOT, 'package.json'), 'utf-8')
+  return JSON.parse(raw)
+}
+
 describe('electron-builder.yml configuration', () => {
   it('is valid YAML that can be parsed', () => {
     const config = loadConfig()
@@ -34,9 +39,25 @@ describe('electron-builder.yml configuration', () => {
     expect(config.files).toContain('out/**/*')
   })
 
-  it('does not bundle extraResources (system Python approach)', () => {
+  it('bundles backend/ as extraResources for packaged mode', () => {
     const config = loadConfig()
-    expect(config.extraResources).toBeUndefined()
+    expect(config.extraResources).toBeDefined()
+    const backendResource = config.extraResources.find(
+      (r: { from: string }) => r.from === 'backend'
+    )
+    expect(backendResource).toBeDefined()
+    expect(backendResource.to).toBe('app.unpacked/backend')
+  })
+
+  it('extraResources backend filter excludes build artifacts', () => {
+    const config = loadConfig()
+    const backendResource = config.extraResources.find(
+      (r: { from: string }) => r.from === 'backend'
+    )
+    const filter: string[] = backendResource.filter
+    expect(filter).toContain('!**/__pycache__/**')
+    expect(filter).toContain('!**/.venv/**')
+    expect(filter).toContain('!**/chroma_data/**')
   })
 
   it('configures macOS target with dmg and hardened runtime', () => {
@@ -71,5 +92,25 @@ describe('electron-builder.yml configuration', () => {
   it('configures macOS app category', () => {
     const config = loadConfig()
     expect(config.mac.category).toBe('public.app-category.productivity')
+  })
+})
+
+describe('package.json build scripts', () => {
+  it('has package script using electron-builder', () => {
+    const pkg = loadPackageJson()
+    expect(pkg.scripts.package).toBeDefined()
+    expect(pkg.scripts.package).toContain('electron-builder')
+  })
+
+  it('has build:mac script', () => {
+    const pkg = loadPackageJson()
+    expect(pkg.scripts['build:mac']).toBeDefined()
+    expect(pkg.scripts['build:mac']).toContain('--mac')
+  })
+
+  it('has build:win script', () => {
+    const pkg = loadPackageJson()
+    expect(pkg.scripts['build:win']).toBeDefined()
+    expect(pkg.scripts['build:win']).toContain('--win')
   })
 })
