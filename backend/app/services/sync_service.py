@@ -24,7 +24,7 @@ class SyncService:
         deleted_count = 0
 
         # 1. Discover current files on disk
-        disk_files = self._ingest.find_markdown_files(self._knowledge_dir)
+        disk_files = self._ingest.find_ingestable_files(self._knowledge_dir)
         disk_paths = {str(f) for f in disk_files}
 
         # 2. Get all known files from DB

@@ -1,4 +1,4 @@
-"""Ingest service — load Markdown, split, embed, store in Chroma, dedup by file_path."""
+"""Ingest service — load Markdown/PDF, split, embed, store in Chroma, dedup by file_path."""
 import hashlib
 import logging
 import uuid
@@ -11,6 +11,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.database import get_db
+from app.services.pdf_extractor import extract_pdf_text
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +39,20 @@ class IngestService:
 
     # ── File discovery ───────────────────────────────────────────
 
+    SUPPORTED_EXTENSIONS = {".md", ".pdf"}
+
     @staticmethod
     def find_markdown_files(directory: Path) -> list[Path]:
         """Recursively find all .md files in directory."""
         return sorted(directory.rglob("*.md"))
+
+    @staticmethod
+    def find_ingestable_files(directory: Path) -> list[Path]:
+        """Recursively find all supported files (.md, .pdf) in directory."""
+        files: list[Path] = []
+        for ext in sorted(IngestService.SUPPORTED_EXTENSIONS):
+            files.extend(directory.rglob(f"*{ext}"))
+        return sorted(files)
 
     # ── Text splitting ───────────────────────────────────────────
 
@@ -99,14 +110,18 @@ class IngestService:
     # ── Full ingest pipeline ─────────────────────────────────────
 
     async def ingest_file(self, file_path: Path, base_dir: Path) -> dict[str, Any]:
-        """Ingest a single Markdown file: read, hash, dedup, split, store, update DB."""
+        """Ingest a single file (Markdown or PDF): read, hash, dedup, split, store, update DB."""
         file_path_str = str(file_path)
 
         try:
             if not file_path.exists():
                 raise FileNotFoundError(f"File not found: {file_path}")
 
-            content = file_path.read_text(encoding="utf-8")
+            # Extract text based on file type
+            if file_path.suffix.lower() == ".pdf":
+                content = extract_pdf_text(file_path)
+            else:
+                content = file_path.read_text(encoding="utf-8")
             file_hash = self.compute_file_hash(file_path)
             file_size = file_path.stat().st_size
             modified_at = datetime.fromtimestamp(file_path.stat().st_mtime).isoformat()
@@ -180,8 +195,8 @@ class IngestService:
             return {"file_path": file_path_str, "status": "error", "error": str(e)}
 
     async def ingest_directory(self, directory: Path) -> list[dict[str, Any]]:
-        """Ingest all Markdown files in a directory."""
-        files = self.find_markdown_files(directory)
+        """Ingest all supported files (.md, .pdf) in a directory."""
+        files = self.find_ingestable_files(directory)
         results = []
         for f in files:
             result = await self.ingest_file(f, directory)

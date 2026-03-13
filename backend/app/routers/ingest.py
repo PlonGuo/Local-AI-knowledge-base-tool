@@ -168,7 +168,7 @@ async def ingest_resync(background_tasks: BackgroundTasks) -> IngestResponse:
     if not knowledge_path.exists():
         knowledge_path.mkdir(parents=True, exist_ok=True)
 
-    files = service.find_markdown_files(knowledge_path)
+    files = service.find_ingestable_files(knowledge_path)
     task_id = str(uuid.uuid4())
 
     # Create task record

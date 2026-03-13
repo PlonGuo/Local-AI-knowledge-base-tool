@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+import fitz  # PyMuPDF
 import pytest
 import pytest_asyncio
 
@@ -250,3 +251,129 @@ async def test_ingest_records_error_on_bad_file(service, db, tmp_path):
     result = await service.ingest_file(bad_path, tmp_path)
     assert result["status"] == "error"
     assert "error" in result
+
+
+# ── find_ingestable_files ────────────────────────────────────────
+
+
+@pytest.fixture
+def mixed_knowledge_dir(tmp_path):
+    """Create a directory with .md, .pdf, and other files."""
+    (tmp_path / "readme.md").write_text("# Readme\n")
+    (tmp_path / "notes.txt").write_text("plain text\n")
+    (tmp_path / "image.png").write_bytes(b"\x89PNG")
+
+    # Create a valid PDF
+    pdf_path = tmp_path / "report.pdf"
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "PDF report content here.")
+    doc.save(str(pdf_path))
+    doc.close()
+
+    # Nested PDF
+    subdir = tmp_path / "subdir"
+    subdir.mkdir()
+    nested_pdf = subdir / "nested.pdf"
+    doc2 = fitz.open()
+    page2 = doc2.new_page()
+    page2.insert_text((72, 72), "Nested PDF content.")
+    doc2.save(str(nested_pdf))
+    doc2.close()
+
+    (subdir / "nested.md").write_text("# Nested MD\n")
+
+    return tmp_path
+
+
+def test_find_ingestable_files_includes_md_and_pdf(service, mixed_knowledge_dir):
+    """find_ingestable_files should discover both .md and .pdf files."""
+    files = service.find_ingestable_files(mixed_knowledge_dir)
+    names = {f.name for f in files}
+    assert "readme.md" in names
+    assert "report.pdf" in names
+    assert "nested.pdf" in names
+    assert "nested.md" in names
+    assert len(files) == 4
+
+
+def test_find_ingestable_files_excludes_other_types(service, mixed_knowledge_dir):
+    """find_ingestable_files should ignore .txt, .png, etc."""
+    files = service.find_ingestable_files(mixed_knowledge_dir)
+    names = {f.name for f in files}
+    assert "notes.txt" not in names
+    assert "image.png" not in names
+
+
+def test_find_ingestable_files_empty_dir(service, tmp_path):
+    """find_ingestable_files returns empty list for empty directory."""
+    files = service.find_ingestable_files(tmp_path)
+    assert files == []
+
+
+def test_find_markdown_files_still_works(service, mixed_knowledge_dir):
+    """find_markdown_files should still work (backward compat)."""
+    files = service.find_markdown_files(mixed_knowledge_dir)
+    assert all(f.suffix == ".md" for f in files)
+    assert len(files) == 2
+
+
+# ── PDF ingest pipeline ─────────────────────────────────────────
+
+
+@pytest.fixture
+def pdf_knowledge_dir(tmp_path):
+    """Create a directory with a PDF file for ingest testing."""
+    pdf_path = tmp_path / "document.pdf"
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "This is PDF content for ingestion testing.")
+    doc.save(str(pdf_path))
+    doc.close()
+    return tmp_path
+
+
+@pytest.mark.asyncio
+async def test_ingest_pdf_file(service, db, pdf_knowledge_dir):
+    """Ingest a PDF file — should create DB record + Chroma chunks."""
+    file_path = pdf_knowledge_dir / "document.pdf"
+    result = await service.ingest_file(file_path, pdf_knowledge_dir)
+
+    assert result["status"] == "indexed"
+    assert result["chunk_count"] >= 1
+
+    # Check DB record
+    cursor = await db.execute("SELECT * FROM documents WHERE file_path = ?", (str(file_path),))
+    row = await cursor.fetchone()
+    assert row is not None
+    assert row["status"] == "indexed"
+    assert row["chunk_count"] >= 1
+
+    # Check Chroma has the content
+    chroma_results = service.collection.get(where={"file_path": str(file_path)})
+    assert len(chroma_results["ids"]) >= 1
+    assert any("PDF content" in doc for doc in chroma_results["documents"])
+
+
+@pytest.mark.asyncio
+async def test_ingest_pdf_skips_unchanged(service, db, pdf_knowledge_dir):
+    """Re-ingesting same PDF should skip if hash unchanged."""
+    file_path = pdf_knowledge_dir / "document.pdf"
+    result1 = await service.ingest_file(file_path, pdf_knowledge_dir)
+    assert result1["status"] == "indexed"
+
+    result2 = await service.ingest_file(file_path, pdf_knowledge_dir)
+    assert result2["status"] == "skipped"
+
+
+@pytest.mark.asyncio
+async def test_ingest_directory_includes_pdf(service, db, mixed_knowledge_dir):
+    """ingest_directory should ingest both .md and .pdf files."""
+    results = await service.ingest_directory(mixed_knowledge_dir)
+    # 2 md + 2 pdf = 4 files
+    assert len(results) == 4
+    assert all(r["status"] == "indexed" for r in results)
+
+    cursor = await db.execute("SELECT COUNT(*) as cnt FROM documents")
+    row = await cursor.fetchone()
+    assert row["cnt"] == 4
