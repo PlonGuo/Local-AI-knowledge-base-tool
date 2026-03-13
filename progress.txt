@@ -86,7 +86,7 @@ Plan: ~/.claude/plans/zany-percolating-key.md
 ### 3D. File Editor
 [x] Task 43: PUT /knowledge/file/content endpoint (save + re-ingest)
 [x] Task 44: Frontend MarkdownEditor component (textarea + Save/Cancel)
-[ ] Task 45: Wire FileTree click to editor view
+[x] Task 45: Wire FileTree click to editor view
 
 ### 3E. File Watcher
 [ ] Task 46: watchdog dependency + FileWatcher service (debounce, extension filter)
@@ -145,3 +145,4 @@ Plan: ~/.claude/plans/zany-percolating-key.md
 2026-03-13 — Task 42 complete: Added 'anthropic' to AppConfig llm_provider type union, added "Anthropic Claude" option to provider dropdown, API key field now shows for both openai-compatible and anthropic providers; 4 new tests (anthropic option exists, API key shown on load, API key shown on switch, label text); all 110 frontend tests pass; tsc clean.
 2026-03-13 — Task 43 complete: PUT /knowledge/file/content endpoint — SaveContentRequest model (path, content), path traversal protection, disk write + re-ingest via IngestService.ingest_file(); 10 new tests (200, response body, disk write, nested, 404, traversal, absolute, directory blocked, re-ingest Chroma, DB update); all 50 knowledge tests pass.
 2026-03-13 — Task 44 complete: MarkdownEditor component with textarea editor, Save (PUT /knowledge/file/content) and Cancel buttons, loading/error/saved feedback states, filename header display, content refetch on filePath change; 11 new tests; all 121 frontend tests pass; tsc clean.
+2026-03-13 — Task 45 complete: Wired FileTree click to MarkdownEditor view — AppLayout gains 'editor' view state + selectedFilePath, Sidebar passes onFileSelect/selectedPath, clicking file opens editor, Cancel returns to chat, settings still accessible; 7 new tests; all 128 frontend tests pass; tsc clean.
