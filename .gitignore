@@ -11,6 +11,5 @@ backend/*.egg-info/
 *.pyc
 backend/logs/
 
-# Packaging artifacts
-extraResources/python/
-extraResources/backend/.venv/
+# Packaging artifacts (build output)
+extraResources/
