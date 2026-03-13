@@ -156,8 +156,8 @@ Plan: ~/.claude/plans/tender-hatching-hopcroft.md
 [x] Task 86: Wire OnboardingPage into App.tsx + AppLayout.tsx
 
 ### 5C. Documentation
-[ ] Task 87: README.md rewrite (features, prerequisites, installation, dev setup)
-[ ] Task 88: CONTRIBUTING.md (dev setup, test commands, contribution guide)
+[x] Task 87: README.md rewrite (features, prerequisites, installation, dev setup)
+[x] Task 88: CONTRIBUTING.md (dev setup, test commands, contribution guide)
 
 === LOG ===
 2026-03-12 — Task 18 complete: Added langchain-core, langchain-community, langchain-text-splitters, chromadb, sentence-transformers, aiosqlite, pyyaml, pytest-asyncio to pyproject.toml; uv sync installs 93 new packages; 7 new import tests; all 21 tests pass.
@@ -223,3 +223,5 @@ Plan: ~/.claude/plans/tender-hatching-hopcroft.md
 2026-03-13 — Task 84 complete: OnboardingPage Step 2 — LLM config form with provider selector (ollama/openai-compatible/anthropic), model name, base URL, API key (conditional), Test Connection button with success/error feedback, Next saves config via PUT /config and advances to Step 3 placeholder; 11 new tests; all 254 frontend+electron tests pass; tsc clean.
 2026-03-13 — Task 85 complete: OnboardingPage Step 3 — ready screen with green checkmark, All Set! heading, setup summary card (python/uv/ollama status + LLM provider/model), Get Started button calls POST /setup/complete then onComplete(); 6 new tests; all 260 tests pass; tsc clean.
 2026-03-13 — Task 86 complete: App.tsx fetches /health + /setup/status in parallel on init; renders OnboardingPage when first_run=true, AppLayout otherwise; onComplete sets firstRun=false to reveal main app; 5 new wiring tests (first_run=true shows onboarding, false shows layout, completes to layout, hides after completion); all 265 tests pass; tsc clean.
+2026-03-13 — Task 87 complete: README.md rewritten — features list, prerequisites table, install/dev/test/build instructions, tech stack table, project structure tree.
+2026-03-13 — Task 88 complete: CONTRIBUTING.md written — dev setup, test commands (Vitest + pytest), code style, architecture notes, PR/issue guide.
