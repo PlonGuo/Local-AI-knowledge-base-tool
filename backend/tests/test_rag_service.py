@@ -1,9 +1,8 @@
 """Tests for RAG query service — Chroma retrieval, prompt assembly, LLM call."""
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
+from langchain_core.messages import AIMessage, AIMessageChunk
 
 from app.config import AppConfig, LLMProvider
 from app.services.rag_service import RAGService
@@ -170,98 +169,188 @@ def test_build_prompt_no_context(rag_service):
     assert "no relevant" in user_msg.lower() or "no context" in user_msg.lower()
 
 
-# ── LLM call (Ollama) ────────────────────────────────────────
+# ── LLM call (via LangChain) ────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_call_llm_ollama(rag_service, default_config):
-    """call_llm() sends correct request to Ollama API."""
+    """call_llm() uses LangChain ChatModel via create_chat_model."""
     messages = [
         {"role": "system", "content": "You are helpful."},
         {"role": "user", "content": "Hi"},
     ]
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "message": {"content": "Hello! How can I help?"},
-    }
+    mock_model = AsyncMock()
+    mock_model.ainvoke.return_value = AIMessage(content="Hello! How can I help?")
 
-    with patch("app.services.rag_service.httpx.AsyncClient") as MockClient:
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_response
-        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
+    with patch("app.services.rag_service.create_chat_model", return_value=mock_model):
         result = await rag_service.call_llm(messages, default_config)
 
     assert result == "Hello! How can I help?"
-    mock_client.post.assert_called_once()
-    call_args = mock_client.post.call_args
-    assert "/api/chat" in call_args[0][0]
-    body = call_args[1]["json"]
-    assert body["model"] == "llama3"
-    assert body["messages"] == messages
-    assert body["stream"] is False
+    mock_model.ainvoke.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_call_llm_openai(rag_service, openai_config):
-    """call_llm() sends correct request to OpenAI-compatible API."""
+    """call_llm() works with OpenAI-compatible config via LangChain."""
     messages = [
         {"role": "system", "content": "You are helpful."},
         {"role": "user", "content": "Hi"},
     ]
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "choices": [{"message": {"content": "Hi there!"}}],
-    }
+    mock_model = AsyncMock()
+    mock_model.ainvoke.return_value = AIMessage(content="Hi there!")
 
-    with patch("app.services.rag_service.httpx.AsyncClient") as MockClient:
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_response
-        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
+    with patch("app.services.rag_service.create_chat_model", return_value=mock_model):
         result = await rag_service.call_llm(messages, openai_config)
 
     assert result == "Hi there!"
-    call_args = mock_client.post.call_args
-    assert "/chat/completions" in call_args[0][0]
-    assert call_args[1]["headers"]["Authorization"] == "Bearer test-key"
+
+
+@pytest.mark.asyncio
+async def test_call_llm_anthropic(rag_service, anthropic_config):
+    """call_llm() works with Anthropic config via LangChain."""
+    messages = [
+        {"role": "system", "content": "You are helpful."},
+        {"role": "user", "content": "Hi"},
+    ]
+    mock_model = AsyncMock()
+    mock_model.ainvoke.return_value = AIMessage(content="Hello from Claude!")
+
+    with patch("app.services.rag_service.create_chat_model", return_value=mock_model):
+        result = await rag_service.call_llm(messages, anthropic_config)
+
+    assert result == "Hello from Claude!"
 
 
 @pytest.mark.asyncio
 async def test_call_llm_connection_error(rag_service, default_config):
-    """call_llm() raises on connection error."""
+    """call_llm() raises ConnectionError on connection failure."""
     messages = [{"role": "user", "content": "Hi"}]
+    mock_model = AsyncMock()
+    mock_model.ainvoke.side_effect = Exception("Connection refused")
 
-    with patch("app.services.rag_service.httpx.AsyncClient") as MockClient:
-        mock_client = AsyncMock()
-        mock_client.post.side_effect = httpx.ConnectError("Connection refused")
-        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
+    with patch("app.services.rag_service.create_chat_model", return_value=mock_model):
         with pytest.raises(ConnectionError, match="LLM connection failed"):
             await rag_service.call_llm(messages, default_config)
 
 
 @pytest.mark.asyncio
-async def test_call_llm_bad_status(rag_service, default_config):
-    """call_llm() raises on non-200 response."""
+async def test_call_llm_non_connection_error(rag_service, default_config):
+    """call_llm() re-raises non-connection errors directly."""
     messages = [{"role": "user", "content": "Hi"}]
-    mock_response = MagicMock()
-    mock_response.status_code = 500
-    mock_response.text = "Internal Server Error"
+    mock_model = AsyncMock()
+    mock_model.ainvoke.side_effect = ValueError("Invalid model")
 
-    with patch("app.services.rag_service.httpx.AsyncClient") as MockClient:
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_response
-        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
-        with pytest.raises(RuntimeError, match="LLM returned status 500"):
+    with patch("app.services.rag_service.create_chat_model", return_value=mock_model):
+        with pytest.raises(ValueError, match="Invalid model"):
             await rag_service.call_llm(messages, default_config)
+
+
+@pytest.mark.asyncio
+async def test_call_llm_converts_messages(rag_service, default_config):
+    """call_llm() converts dict messages to LangChain messages via dicts_to_messages."""
+    messages = [
+        {"role": "system", "content": "System prompt"},
+        {"role": "user", "content": "User question"},
+    ]
+    mock_model = AsyncMock()
+    mock_model.ainvoke.return_value = AIMessage(content="Answer")
+
+    with patch("app.services.rag_service.create_chat_model", return_value=mock_model) as mock_factory:
+        with patch("app.services.rag_service.dicts_to_messages", wraps=__import__("app.services.llm_factory", fromlist=["dicts_to_messages"]).dicts_to_messages) as mock_convert:
+            result = await rag_service.call_llm(messages, default_config)
+
+    assert result == "Answer"
+    mock_convert.assert_called_once_with(messages)
+    mock_factory.assert_called_once_with(default_config)
+
+
+# ── LLM streaming (via LangChain) ──────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_call_llm_stream_yields_tokens(rag_service, default_config):
+    """call_llm_stream() yields content from LangChain astream chunks."""
+    messages = [
+        {"role": "system", "content": "You are helpful."},
+        {"role": "user", "content": "Hi"},
+    ]
+
+    async def mock_astream(lc_messages):
+        yield AIMessageChunk(content="Hello")
+        yield AIMessageChunk(content=" world")
+        yield AIMessageChunk(content="!")
+
+    mock_model = MagicMock()
+    mock_model.astream = mock_astream
+
+    with patch("app.services.rag_service.create_chat_model", return_value=mock_model):
+        tokens = []
+        async for token in rag_service.call_llm_stream(messages, default_config):
+            tokens.append(token)
+
+    assert tokens == ["Hello", " world", "!"]
+
+
+@pytest.mark.asyncio
+async def test_call_llm_stream_skips_empty(rag_service, default_config):
+    """call_llm_stream() skips chunks with empty content."""
+    messages = [{"role": "user", "content": "Hi"}]
+
+    async def mock_astream(lc_messages):
+        yield AIMessageChunk(content="")
+        yield AIMessageChunk(content="Hello")
+        yield AIMessageChunk(content="")
+
+    mock_model = MagicMock()
+    mock_model.astream = mock_astream
+
+    with patch("app.services.rag_service.create_chat_model", return_value=mock_model):
+        tokens = []
+        async for token in rag_service.call_llm_stream(messages, default_config):
+            tokens.append(token)
+
+    assert tokens == ["Hello"]
+
+
+@pytest.mark.asyncio
+async def test_call_llm_stream_connection_error(rag_service, default_config):
+    """call_llm_stream() raises ConnectionError on connection failure."""
+    messages = [{"role": "user", "content": "Hi"}]
+
+    async def mock_astream(lc_messages):
+        raise Exception("Connection refused")
+        yield  # make it a generator
+
+    mock_model = MagicMock()
+    mock_model.astream = mock_astream
+
+    with patch("app.services.rag_service.create_chat_model", return_value=mock_model):
+        with pytest.raises(ConnectionError, match="LLM connection failed"):
+            async for _ in rag_service.call_llm_stream(messages, default_config):
+                pass
+
+
+@pytest.mark.asyncio
+async def test_call_llm_stream_anthropic(rag_service, anthropic_config):
+    """call_llm_stream() works with Anthropic config via LangChain."""
+    messages = [
+        {"role": "system", "content": "You are helpful."},
+        {"role": "user", "content": "Hi"},
+    ]
+
+    async def mock_astream(lc_messages):
+        yield AIMessageChunk(content="Hello")
+        yield AIMessageChunk(content=" Claude")
+
+    mock_model = MagicMock()
+    mock_model.astream = mock_astream
+
+    with patch("app.services.rag_service.create_chat_model", return_value=mock_model):
+        tokens = []
+        async for token in rag_service.call_llm_stream(messages, anthropic_config):
+            tokens.append(token)
+
+    assert tokens == ["Hello", " Claude"]
 
 
 # ── Full query pipeline ──────────────────────────────────────
@@ -270,18 +359,12 @@ async def test_call_llm_bad_status(rag_service, default_config):
 @pytest.mark.asyncio
 async def test_query_full_pipeline(rag_service, mock_collection, default_config):
     """query() orchestrates retrieve → build_prompt → call_llm."""
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "message": {"content": "Python is a programming language created by Guido."},
-    }
+    mock_model = AsyncMock()
+    mock_model.ainvoke.return_value = AIMessage(
+        content="Python is a programming language created by Guido."
+    )
 
-    with patch("app.services.rag_service.httpx.AsyncClient") as MockClient:
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_response
-        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
+    with patch("app.services.rag_service.create_chat_model", return_value=mock_model):
         result = await rag_service.query("What is Python?", default_config)
 
     assert result["answer"] == "Python is a programming language created by Guido."
@@ -299,18 +382,12 @@ async def test_query_no_results(rag_service, mock_collection, default_config):
         "metadatas": [[]],
         "distances": [[]],
     }
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "message": {"content": "I don't have relevant information."},
-    }
+    mock_model = AsyncMock()
+    mock_model.ainvoke.return_value = AIMessage(
+        content="I don't have relevant information."
+    )
 
-    with patch("app.services.rag_service.httpx.AsyncClient") as MockClient:
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_response
-        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
+    with patch("app.services.rag_service.create_chat_model", return_value=mock_model):
         result = await rag_service.query("Unknown topic", default_config)
 
     assert result["answer"] == "I don't have relevant information."
@@ -320,175 +397,10 @@ async def test_query_no_results(rag_service, mock_collection, default_config):
 @pytest.mark.asyncio
 async def test_query_custom_k(rag_service, mock_collection, default_config):
     """query() passes k to retrieve()."""
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "message": {"content": "Answer"},
-    }
+    mock_model = AsyncMock()
+    mock_model.ainvoke.return_value = AIMessage(content="Answer")
 
-    with patch("app.services.rag_service.httpx.AsyncClient") as MockClient:
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_response
-        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
+    with patch("app.services.rag_service.create_chat_model", return_value=mock_model):
         await rag_service.query("test", default_config, k=10)
 
     mock_collection.query.assert_called_once_with(query_texts=["test"], n_results=10)
-
-
-# ── LLM call (Anthropic) ────────────────────────────────────
-
-
-@pytest.mark.asyncio
-async def test_call_llm_anthropic(rag_service, anthropic_config):
-    """call_llm() sends correct request to Anthropic Messages API."""
-    messages = [
-        {"role": "system", "content": "You are helpful."},
-        {"role": "user", "content": "Hi"},
-    ]
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "content": [{"type": "text", "text": "Hello from Claude!"}],
-    }
-
-    with patch("app.services.rag_service.httpx.AsyncClient") as MockClient:
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_response
-        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
-        result = await rag_service.call_llm(messages, anthropic_config)
-
-    assert result == "Hello from Claude!"
-    call_args = mock_client.post.call_args
-    # Endpoint is /v1/messages
-    assert "/v1/messages" in call_args[0][0]
-    # Uses x-api-key header (not Bearer)
-    assert call_args[1]["headers"]["x-api-key"] == "sk-ant-test-key"
-    assert call_args[1]["headers"]["anthropic-version"] == "2023-06-01"
-    # System prompt extracted from messages into 'system' field
-    body = call_args[1]["json"]
-    assert body["system"] == "You are helpful."
-    assert body["model"] == "claude-sonnet-4-20250514"
-    assert body["max_tokens"] == 4096
-    # Messages should NOT contain system role
-    assert all(m["role"] != "system" for m in body["messages"])
-    assert body["messages"] == [{"role": "user", "content": "Hi"}]
-
-
-@pytest.mark.asyncio
-async def test_call_llm_anthropic_no_system(rag_service, anthropic_config):
-    """call_llm() works with Anthropic when no system message is present."""
-    messages = [{"role": "user", "content": "Hi"}]
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {
-        "content": [{"type": "text", "text": "Hello!"}],
-    }
-
-    with patch("app.services.rag_service.httpx.AsyncClient") as MockClient:
-        mock_client = AsyncMock()
-        mock_client.post.return_value = mock_response
-        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
-        result = await rag_service.call_llm(messages, anthropic_config)
-
-    assert result == "Hello!"
-    body = mock_client.post.call_args[1]["json"]
-    # No system field when no system message
-    assert "system" not in body
-    assert body["messages"] == [{"role": "user", "content": "Hi"}]
-
-
-# ── LLM streaming (Anthropic) ──────────────────────────────
-
-
-@pytest.mark.asyncio
-async def test_call_llm_stream_anthropic(rag_service, anthropic_config):
-    """call_llm_stream() yields tokens from Anthropic SSE stream."""
-    messages = [
-        {"role": "system", "content": "You are helpful."},
-        {"role": "user", "content": "Hi"},
-    ]
-
-    # Simulate Anthropic SSE lines
-    sse_lines = [
-        'event: message_start',
-        'data: {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","content":[]}}',
-        '',
-        'event: content_block_start',
-        'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
-        '',
-        'event: content_block_delta',
-        'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}',
-        '',
-        'event: content_block_delta',
-        'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" Claude"}}',
-        '',
-        'event: content_block_stop',
-        'data: {"type":"content_block_stop","index":0}',
-        '',
-        'event: message_stop',
-        'data: {"type":"message_stop"}',
-        '',
-    ]
-
-    mock_resp = AsyncMock()
-    mock_resp.status_code = 200
-    mock_resp.aiter_lines = MagicMock(return_value=_async_iter(sse_lines))
-
-    stream_cm = MagicMock()
-    stream_cm.__aenter__ = AsyncMock(return_value=mock_resp)
-    stream_cm.__aexit__ = AsyncMock(return_value=False)
-
-    with patch("app.services.rag_service.httpx.AsyncClient") as MockClient:
-        mock_client = MagicMock()
-        mock_client.stream = MagicMock(return_value=stream_cm)
-        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
-        tokens = []
-        async for token in rag_service.call_llm_stream(messages, anthropic_config):
-            tokens.append(token)
-
-    assert tokens == ["Hello", " Claude"]
-    call_args = mock_client.stream.call_args
-    assert "/v1/messages" in call_args[0][1]
-    assert call_args[1]["headers"]["x-api-key"] == "sk-ant-test-key"
-    body = call_args[1]["json"]
-    assert body["stream"] is True
-    assert body["system"] == "You are helpful."
-    assert all(m["role"] != "system" for m in body["messages"])
-
-
-@pytest.mark.asyncio
-async def test_call_llm_stream_anthropic_bad_status(rag_service, anthropic_config):
-    """call_llm_stream() raises on non-200 from Anthropic."""
-    messages = [{"role": "user", "content": "Hi"}]
-    mock_resp = AsyncMock()
-    mock_resp.status_code = 401
-
-    stream_cm = MagicMock()
-    stream_cm.__aenter__ = AsyncMock(return_value=mock_resp)
-    stream_cm.__aexit__ = AsyncMock(return_value=False)
-
-    with patch("app.services.rag_service.httpx.AsyncClient") as MockClient:
-        mock_client = MagicMock()
-        mock_client.stream = MagicMock(return_value=stream_cm)
-        MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
-        with pytest.raises(RuntimeError, match="LLM returned status 401"):
-            async for _ in rag_service.call_llm_stream(messages, anthropic_config):
-                pass
-
-
-# ── Helper for async iteration in tests ─────────────────────
-
-
-async def _async_iter(items):
-    for item in items:
-        yield item

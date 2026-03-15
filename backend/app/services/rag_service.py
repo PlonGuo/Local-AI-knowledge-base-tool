@@ -1,12 +1,10 @@
 """RAG query service — Chroma retrieval, prompt assembly, LLM call."""
-import json
 import logging
 import os
 from typing import Any, AsyncGenerator
 
-import httpx
-
-from app.config import AppConfig, LLMProvider
+from app.config import AppConfig
+from app.services.llm_factory import create_chat_model, dicts_to_messages
 
 logger = logging.getLogger(__name__)
 
@@ -104,40 +102,6 @@ class RAGService:
             {"role": "user", "content": user_content},
         ]
 
-    # ── Anthropic helpers ─────────────────────────────────────
-
-    @staticmethod
-    def _prepare_anthropic(
-        messages: list[dict[str, str]], config: AppConfig
-    ) -> tuple[str, dict[str, str], dict]:
-        """Build Anthropic-specific URL, headers, and JSON body.
-
-        Extracts system message from the messages list into the top-level
-        ``system`` field required by the Anthropic Messages API.
-        """
-        url = f"{config.base_url.rstrip('/')}/v1/messages"
-        headers = {
-            "x-api-key": config.api_key or "",
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        }
-        # Separate system message from user/assistant messages
-        system_text = None
-        api_messages = []
-        for m in messages:
-            if m["role"] == "system":
-                system_text = m["content"]
-            else:
-                api_messages.append(m)
-        body: dict = {
-            "model": config.model_name,
-            "max_tokens": 4096,
-            "messages": api_messages,
-        }
-        if system_text:
-            body["system"] = system_text
-        return url, headers, body
-
     # ── LLM call ──────────────────────────────────────────────
 
     async def call_llm(
@@ -145,52 +109,14 @@ class RAGService:
     ) -> str:
         """Send messages to LLM and return the response text."""
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                if config.llm_provider == LLMProvider.OLLAMA:
-                    url = f"{config.base_url.rstrip('/')}/api/chat"
-                    resp = await client.post(
-                        url,
-                        json={
-                            "model": config.model_name,
-                            "messages": messages,
-                            "stream": False,
-                        },
-                    )
-                elif config.llm_provider == LLMProvider.ANTHROPIC:
-                    url, headers, body = self._prepare_anthropic(messages, config)
-                    body["stream"] = False
-                    resp = await client.post(url, json=body, headers=headers)
-                else:
-                    # OpenAI-compatible
-                    url = f"{config.base_url.rstrip('/')}/chat/completions"
-                    headers: dict[str, str] = {}
-                    if config.api_key:
-                        headers["Authorization"] = f"Bearer {config.api_key}"
-                    resp = await client.post(
-                        url,
-                        json={
-                            "model": config.model_name,
-                            "messages": messages,
-                            "stream": False,
-                        },
-                        headers=headers,
-                    )
-
-                if resp.status_code != 200:
-                    raise RuntimeError(
-                        f"LLM returned status {resp.status_code}: {resp.text}"
-                    )
-
-                data = resp.json()
-                if config.llm_provider == LLMProvider.OLLAMA:
-                    return data["message"]["content"]
-                elif config.llm_provider == LLMProvider.ANTHROPIC:
-                    return data["content"][0]["text"]
-                else:
-                    return data["choices"][0]["message"]["content"]
-
-        except httpx.ConnectError as e:
-            raise ConnectionError(f"LLM connection failed: {e}") from e
+            model = create_chat_model(config)
+            lc_messages = dicts_to_messages(messages)
+            response = await model.ainvoke(lc_messages)
+            return response.content
+        except Exception as e:
+            if "connect" in str(e).lower() or "connection" in str(e).lower():
+                raise ConnectionError(f"LLM connection failed: {e}") from e
+            raise
 
     # ── LLM streaming call ─────────────────────────────────────
 
@@ -199,84 +125,15 @@ class RAGService:
     ) -> AsyncGenerator[str, None]:
         """Stream tokens from LLM. Yields individual content tokens."""
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                if config.llm_provider == LLMProvider.OLLAMA:
-                    url = f"{config.base_url.rstrip('/')}/api/chat"
-                    async with client.stream(
-                        "POST",
-                        url,
-                        json={
-                            "model": config.model_name,
-                            "messages": messages,
-                            "stream": True,
-                        },
-                    ) as resp:
-                        if resp.status_code != 200:
-                            raise RuntimeError(
-                                f"LLM returned status {resp.status_code}"
-                            )
-                        async for line in resp.aiter_lines():
-                            if not line:
-                                continue
-                            data = json.loads(line)
-                            content = data.get("message", {}).get("content", "")
-                            if content:
-                                yield content
-                elif config.llm_provider == LLMProvider.ANTHROPIC:
-                    url, headers, body = self._prepare_anthropic(messages, config)
-                    body["stream"] = True
-                    async with client.stream(
-                        "POST", url, json=body, headers=headers,
-                    ) as resp:
-                        if resp.status_code != 200:
-                            raise RuntimeError(
-                                f"LLM returned status {resp.status_code}"
-                            )
-                        async for line in resp.aiter_lines():
-                            if not line or not line.startswith("data: "):
-                                continue
-                            payload = line[6:]
-                            data = json.loads(payload)
-                            if data.get("type") == "content_block_delta":
-                                text = data.get("delta", {}).get("text", "")
-                                if text:
-                                    yield text
-                            elif data.get("type") == "message_stop":
-                                break
-                else:
-                    # OpenAI-compatible SSE
-                    url = f"{config.base_url.rstrip('/')}/chat/completions"
-                    headers: dict[str, str] = {}
-                    if config.api_key:
-                        headers["Authorization"] = f"Bearer {config.api_key}"
-                    async with client.stream(
-                        "POST",
-                        url,
-                        json={
-                            "model": config.model_name,
-                            "messages": messages,
-                            "stream": True,
-                        },
-                        headers=headers,
-                    ) as resp:
-                        if resp.status_code != 200:
-                            raise RuntimeError(
-                                f"LLM returned status {resp.status_code}"
-                            )
-                        async for line in resp.aiter_lines():
-                            if not line or not line.startswith("data: "):
-                                continue
-                            payload = line[6:]
-                            if payload == "[DONE]":
-                                break
-                            data = json.loads(payload)
-                            delta = data["choices"][0].get("delta", {})
-                            content = delta.get("content", "")
-                            if content:
-                                yield content
-
-        except httpx.ConnectError as e:
-            raise ConnectionError(f"LLM connection failed: {e}") from e
+            model = create_chat_model(config)
+            lc_messages = dicts_to_messages(messages)
+            async for chunk in model.astream(lc_messages):
+                if chunk.content:
+                    yield chunk.content
+        except Exception as e:
+            if "connect" in str(e).lower() or "connection" in str(e).lower():
+                raise ConnectionError(f"LLM connection failed: {e}") from e
+            raise
 
     # ── Full query pipeline ───────────────────────────────────
 
