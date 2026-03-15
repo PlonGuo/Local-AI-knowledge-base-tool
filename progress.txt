@@ -181,10 +181,10 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 ### 7A. Frontmatter + Template Schema
 [x] Task 98: Frontmatter parser (FrontmatterData dataclass + parse_frontmatter)
 [x] Task 99: SQLite schema migration (add title, category, tags, difficulty, pack_id columns)
-[ ] Task 100: Wire frontmatter into IngestService (parse before chunking, store in SQLite + Chroma)
+[x] Task 100: Wire frontmatter into IngestService (parse before chunking, store in SQLite + Chroma)
 
 ### 7B. Heading-Aware Chunking
-[ ] Task 101: Heading chunker (split_by_headings with merge/sub-split logic)
+[x] Task 101: Heading chunker (split_by_headings with merge/sub-split logic)
 [ ] Task 102: Wire heading chunker into IngestService (.md uses headings, .pdf keeps fixed split)
 
 ### 7C. HyDE Pre-Retrieval
@@ -205,6 +205,8 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 [ ] Task 111: Full integration verification (all backend + frontend tests)
 
 === LOG ===
+2026-03-15 — Task 101 complete: app/services/heading_chunker.py — split_by_headings(text, metadata) splits Markdown by heading lines (# through ######) into langchain Documents; merges short sections (<100 chars) into next section; sub-splits long sections (>1500 chars) via RecursiveCharacterTextSplitter; adds section_heading + chunk_index metadata; handles preamble, empty text, no-headings cases; 19 new tests; all 19 pass.
+2026-03-15 — Task 100 complete: Wired frontmatter parsing into IngestService.ingest_file() — .md files: parse_frontmatter() extracts FrontmatterData before chunking, body (without YAML block) used for splitting; frontmatter fields (title, category, tags as comma-separated string, difficulty, pack_id) stored in both SQLite (INSERT/UPDATE) and Chroma chunk metadata (only non-None values to avoid Chroma null errors); PDF files skip frontmatter parsing; 7 new tests (SQLite storage, Chroma metadata, body-only chunking, NULL for no-frontmatter, PDF skips, update on reingest, no None in Chroma); all 513/514 backend tests pass (1 pre-existing config test isolation failure).
 2026-03-15 — Task 99 complete: Added title, category, tags, difficulty, pack_id columns to documents table in database.py (CREATE TABLE + ALTER TABLE migration for existing DBs); updated DocumentCreate and Document Pydantic models with Optional frontmatter fields; _migrate_documents_table() checks PRAGMA table_info before ALTER; 11 new tests (column existence x5, defaults NULL, insert with frontmatter, migration idempotent, model tests x3); all 29 database tests pass; 506/507 backend tests pass (1 pre-existing config test isolation failure).
 2026-03-15 — Task 98 complete: app/services/frontmatter_parser.py — FrontmatterData dataclass (title, category, tags, difficulty, pack_id) + parse_frontmatter(text) → (FrontmatterData, body); regex-based frontmatter extraction with yaml.safe_load; handles missing/empty/malformed YAML, CRLF, inline/string tags normalization, extra fields ignored; 15 new tests; all 15 pass.
 2026-03-14 — Task 97 complete: Full integration verification — 480/481 backend tests pass (1 pre-existing config test isolation failure), 265/265 frontend tests pass, 30/30 test files pass. Phase 6 LangChain+LangGraph migration complete.
