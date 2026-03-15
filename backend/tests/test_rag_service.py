@@ -118,6 +118,67 @@ def test_retrieve_empty_results(rag_service, mock_collection):
     assert results == []
 
 
+# ── Metadata-filtered retrieval ──────────────────────────────
+
+
+def test_retrieve_with_where_filter(rag_service, mock_collection):
+    """retrieve() passes where dict to collection.query when provided."""
+    mock_collection.query.return_value = {
+        "ids": [["id1"]],
+        "documents": [["Filtered chunk."]],
+        "metadatas": [[{"file_path": "packs/leetcode/two-sum.md", "chunk_index": 0}]],
+        "distances": [[0.1]],
+    }
+    where = {"pack_id": "leetcode"}
+    results = rag_service.retrieve("two sum", k=3, where=where)
+
+    mock_collection.query.assert_called_once_with(
+        query_texts=["two sum"],
+        n_results=3,
+        where={"pack_id": "leetcode"},
+    )
+    assert len(results) == 1
+    assert results[0]["file_path"] == "packs/leetcode/two-sum.md"
+
+
+def test_retrieve_without_where_filter(rag_service, mock_collection):
+    """retrieve() does not pass where kwarg when where is None (backward compat)."""
+    rag_service.retrieve("test query", k=5)
+
+    mock_collection.query.assert_called_once_with(
+        query_texts=["test query"],
+        n_results=5,
+    )
+
+
+def test_retrieve_where_none_explicit(rag_service, mock_collection):
+    """retrieve(where=None) does not pass where kwarg."""
+    rag_service.retrieve("test query", k=5, where=None)
+
+    mock_collection.query.assert_called_once_with(
+        query_texts=["test query"],
+        n_results=5,
+    )
+
+
+def test_retrieve_where_complex_filter(rag_service, mock_collection):
+    """retrieve() passes complex Chroma where filters."""
+    mock_collection.query.return_value = {
+        "ids": [["id1"]],
+        "documents": [["Result"]],
+        "metadatas": [[{"file_path": "a.md", "chunk_index": 0}]],
+        "distances": [[0.2]],
+    }
+    where = {"$and": [{"pack_id": "leetcode"}, {"difficulty": "easy"}]}
+    rag_service.retrieve("query", k=3, where=where)
+
+    mock_collection.query.assert_called_once_with(
+        query_texts=["query"],
+        n_results=3,
+        where={"$and": [{"pack_id": "leetcode"}, {"difficulty": "easy"}]},
+    )
+
+
 # ── Source extraction ─────────────────────────────────────────
 
 

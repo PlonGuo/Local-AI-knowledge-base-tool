@@ -45,9 +45,12 @@ class RAGService:
 
     # ── Retrieval ─────────────────────────────────────────────
 
-    def retrieve(self, query: str, k: int = 5) -> list[dict[str, Any]]:
-        """Query Chroma for top-k similar chunks."""
-        results = self._collection.query(query_texts=[query], n_results=k)
+    def retrieve(self, query: str, k: int = 5, where: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        """Query Chroma for top-k similar chunks, optionally filtered by metadata."""
+        query_kwargs: dict[str, Any] = {"query_texts": [query], "n_results": k}
+        if where is not None:
+            query_kwargs["where"] = where
+        results = self._collection.query(**query_kwargs)
 
         chunks = []
         for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
