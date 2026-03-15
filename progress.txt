@@ -197,7 +197,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 [x] Task 107: Add pack_id filter to chat API (optional pack_id in ChatRequest)
 
 ### 7E. Sample Content + Eval
-[ ] Task 108: Sample knowledge pack (5-10 LeetCode .md files with frontmatter + eval dataset)
+[x] Task 108: Sample knowledge pack (5-10 LeetCode .md files with frontmatter + eval dataset)
 [ ] Task 109: Ingest + eval integration test (verify frontmatter, heading chunks, pack_id filter)
 
 ### 7F. Migration + Verification
