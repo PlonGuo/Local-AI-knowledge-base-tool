@@ -242,13 +242,14 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 
 ### 9D. Conversation Memory
 [x] Task 128: Query rewriter service (LLM rewrites with history context)
-[ ] Task 129: Rewrite_query node in LangGraph (conditional at START)
+[x] Task 129: Rewrite_query node in LangGraph (conditional at START)
 
 ### 9E. Frontend + Verification
 [ ] Task 130: Frontend settings (strategy dropdown, reranker toggle+download, memory turns)
 [ ] Task 131: Full integration verification (all backend + frontend tests)
 
 === LOG ===
+2026-03-15 — Task 129 complete: Added chat_memory_turns to RAGState; added _start_route() (rewrite_query if turns > 0, else route_pre_retrieval); added rewrite_query_node and route_pre_retrieval pass-through node; refactored rag_graph.py with _build_graph_nodes() helper and _add_common_edges() to reduce duplication; graph flow: START → [rewrite_query →] route_pre_retrieval → [hyde|multi_query →] retrieve → [rerank →] build_prompt → [generate →] END; updated chat.py to pass chat_memory_turns from config; updated test_chat_graph_wiring.py; 12 new tests in test_rag_graph_memory.py (state field, route function, full/prep graph called/skipped, combo with hyde/multi_query); all 12 pass; all 67 existing graph+chat tests pass.
 2026-03-15 — Task 128 complete: app/services/query_rewriter.py — fetch_chat_history(n_turns) queries SQLite chat_messages for last N messages (oldest-first); _format_history() formats as "Role: content" lines; rewrite_query(question, history, config) uses LLM to rewrite follow-up question into standalone question; falls back to original on empty history/response/error; 13 new tests (2 format, 3 fetch, 8 rewrite); all 13 pass.
 2026-03-15 — Task 127 complete: Replaced multi_query placeholder in rag_graph.py with real implementation — calls expand_queries() for query variants, retrieves per variant, merges with _dedup_chunks() by (file_path, chunk_index); multi_query now does its own retrieval (skips standard retrieve node), routes directly to post-retrieve conditional (rerank or build_prompt); added _dedup_chunks() helper; supports pack_id filter; 11 new tests in test_rag_graph_multi_query.py (5 dedup, 6 graph); all 11 pass; all 33 existing routing/hyde/rerank tests pass.
 2026-03-15 — Task 126 complete: app/services/multi_query_service.py — expand_queries(question, config) uses LLM to generate 3-5 query variants via MULTI_QUERY_PROMPT; _parse_numbered_lines() extracts numbered lines (1. or 1) format); always includes original question; falls back to [question] on empty/None/error/no-numbered-lines; 15 new tests (6 parser + 9 expand); all 15 pass.

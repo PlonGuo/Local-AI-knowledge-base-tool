@@ -82,6 +82,7 @@ async def _chat_stream(question: str, k: int, pack_id: Optional[str] = None) -> 
         "k": k,
         "pre_retrieval_strategy": config.pre_retrieval_strategy.value,
         "use_reranker": config.use_reranker,
+        "chat_memory_turns": config.chat_memory_turns,
     }
     if pack_id is not None:
         state_input["pack_id"] = pack_id
