@@ -73,3 +73,26 @@ def test_langfuse_importable():
 def test_ragas_metrics_importable():
     mod = importlib.import_module("ragas.metrics")
     assert mod, "ragas.metrics should be importable"
+
+
+# Task 89: LangChain provider + LangGraph dependencies
+
+
+def test_langchain_ollama_importable():
+    mod = importlib.import_module("langchain_ollama")
+    assert mod, "langchain_ollama should be importable"
+
+
+def test_langchain_openai_importable():
+    mod = importlib.import_module("langchain_openai")
+    assert mod, "langchain_openai should be importable"
+
+
+def test_langchain_anthropic_importable():
+    mod = importlib.import_module("langchain_anthropic")
+    assert mod, "langchain_anthropic should be importable"
+
+
+def test_langgraph_importable():
+    from langgraph.graph import StateGraph
+    assert StateGraph, "langgraph StateGraph should be importable"
