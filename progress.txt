@@ -188,7 +188,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 [x] Task 102: Wire heading chunker into IngestService (.md uses headings, .pdf keeps fixed split)
 
 ### 7C. HyDE Pre-Retrieval
-[ ] Task 103: HyDE service (generate_hypothetical_doc via LLM)
+[x] Task 103: HyDE service (generate_hypothetical_doc via LLM)
 [ ] Task 104: Add HyDE node to RAG graph (hyde → retrieve → build_prompt → END)
 [ ] Task 105: Update chat router for HyDE (pass config.use_hyde to graph state)
 
@@ -205,6 +205,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 [ ] Task 111: Full integration verification (all backend + frontend tests)
 
 === LOG ===
+2026-03-15 — Task 103 complete: app/services/hyde_service.py — generate_hypothetical_doc(question, config) uses create_chat_model() to generate a hypothetical document passage for improved retrieval; HYDE_PROMPT_TEMPLATE instructs LLM to write 2-4 sentence factual passage; graceful fallback to original question on empty/None response or LLM error; 9 new tests (prompt template, return type, question in prompt, factory called, whitespace strip, empty fallback, None fallback, error fallback, message structure); all 9 pass.
 2026-03-15 — Task 102 complete: Wired heading chunker into IngestService.ingest_file() — .md files now use split_by_headings() (heading-aware chunking with section_heading metadata), .pdf files keep fixed-size split_text(); fallback to split_text() if heading chunker returns empty; 5 new tests (md uses heading chunker, pdf uses fixed split, chunk_index preserved, frontmatter metadata preserved, md without headings); all 537/538 backend tests pass (1 pre-existing config test isolation failure).
 2026-03-15 — Task 101 complete: app/services/heading_chunker.py — split_by_headings(text, metadata) splits Markdown by heading lines (# through ######) into langchain Documents; merges short sections (<100 chars) into next section; sub-splits long sections (>1500 chars) via RecursiveCharacterTextSplitter; adds section_heading + chunk_index metadata; handles preamble, empty text, no-headings cases; 19 new tests; all 19 pass.
 2026-03-15 — Task 100 complete: Wired frontmatter parsing into IngestService.ingest_file() — .md files: parse_frontmatter() extracts FrontmatterData before chunking, body (without YAML block) used for splitting; frontmatter fields (title, category, tags as comma-separated string, difficulty, pack_id) stored in both SQLite (INSERT/UPDATE) and Chroma chunk metadata (only non-None values to avoid Chroma null errors); PDF files skip frontmatter parsing; 7 new tests (SQLite storage, Chroma metadata, body-only chunking, NULL for no-frontmatter, PDF skips, update on reingest, no None in Chroma); all 513/514 backend tests pass (1 pre-existing config test isolation failure).
