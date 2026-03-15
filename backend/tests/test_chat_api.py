@@ -157,8 +157,8 @@ class TestPostChat:
 
     @patch("app.routers.chat._get_rag_service")
     @patch("app.routers.chat._get_config")
-    def test_chat_passes_use_hyde_false_by_default(self, mock_config, mock_rag, client, mock_rag_service):
-        """POST /chat passes use_hyde=False to graph state by default (pre_retrieval_strategy=none)."""
+    def test_chat_passes_strategy_none_by_default(self, mock_config, mock_rag, client, mock_rag_service):
+        """POST /chat passes pre_retrieval_strategy='none' to graph state by default."""
         from app.config import AppConfig
 
         mock_config.return_value = AppConfig()  # pre_retrieval_strategy defaults to "none"
@@ -171,16 +171,16 @@ class TestPostChat:
 
         resp = client.post("/chat", json={"question": "test"})
         assert resp.status_code == 200
-        # With use_hyde=False (default), retrieve is called with the original question
+        # With pre_retrieval_strategy='none', retrieve is called with the original question
         mock_rag_service.retrieve.assert_called_once_with("test", k=5)
 
     @patch("app.services.rag_graph.generate_hypothetical_doc")
     @patch("app.routers.chat._get_rag_service")
     @patch("app.routers.chat._get_config")
-    def test_chat_passes_use_hyde_true_from_config(
+    def test_chat_passes_strategy_hyde_from_config(
         self, mock_config, mock_rag, mock_hyde, client, mock_rag_service
     ):
-        """POST /chat passes use_hyde=True when config has pre_retrieval_strategy=hyde."""
+        """POST /chat passes pre_retrieval_strategy='hyde' when config has PreRetrievalStrategy.HYDE."""
         from app.config import AppConfig, PreRetrievalStrategy
 
         mock_config.return_value = AppConfig(pre_retrieval_strategy=PreRetrievalStrategy.HYDE)
@@ -199,7 +199,7 @@ class TestPostChat:
 
         resp = client.post("/chat", json={"question": "test"})
         assert resp.status_code == 200
-        # With use_hyde=True, retrieve is called with the hypothetical doc
+        # With pre_retrieval_strategy='hyde', retrieve is called with the hypothetical doc
         mock_rag_service.retrieve.assert_called_once_with("hypothetical answer about test", k=5)
 
     @patch("app.routers.chat._get_rag_service")

@@ -41,21 +41,12 @@ def default_config():
     return AppConfig()
 
 
-# ── RAGState has use_hyde field ──────────────────────────────
-
-
-def test_rag_state_has_use_hyde_field():
-    """RAGState TypedDict includes use_hyde."""
-    from app.services.rag_graph import RAGState
-    assert "use_hyde" in RAGState.__annotations__
-
-
 # ── Full graph with HyDE ─────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_full_graph_with_hyde_calls_generate_hypothetical_doc(rag_service, default_config):
-    """When use_hyde=True, the full graph calls generate_hypothetical_doc before retrieve."""
+    """When pre_retrieval_strategy='hyde', the full graph calls generate_hypothetical_doc before retrieve."""
     from app.services.rag_graph import create_rag_graph
 
     mock_model = AsyncMock()
@@ -67,7 +58,7 @@ async def test_full_graph_with_hyde_calls_generate_hypothetical_doc(rag_service,
     ):
         mock_hyde.return_value = "Python is a versatile programming language."
         graph = create_rag_graph(rag_service, default_config)
-        result = await graph.ainvoke({"question": "What is Python?", "use_hyde": True})
+        result = await graph.ainvoke({"question": "What is Python?", "pre_retrieval_strategy": "hyde"})
 
     mock_hyde.assert_called_once_with("What is Python?", default_config)
     # Retrieve was called with the hypothetical doc, not the original question
@@ -78,7 +69,7 @@ async def test_full_graph_with_hyde_calls_generate_hypothetical_doc(rag_service,
 
 @pytest.mark.asyncio
 async def test_full_graph_without_hyde_skips_generate(rag_service, default_config):
-    """When use_hyde=False, the full graph does NOT call generate_hypothetical_doc."""
+    """When pre_retrieval_strategy='none', the full graph does NOT call generate_hypothetical_doc."""
     from app.services.rag_graph import create_rag_graph
 
     mock_model = AsyncMock()
@@ -89,7 +80,7 @@ async def test_full_graph_without_hyde_skips_generate(rag_service, default_confi
         patch("app.services.rag_service.create_chat_model", return_value=mock_model),
     ):
         graph = create_rag_graph(rag_service, default_config)
-        result = await graph.ainvoke({"question": "What is Python?", "use_hyde": False})
+        result = await graph.ainvoke({"question": "What is Python?", "pre_retrieval_strategy": "none"})
 
     mock_hyde.assert_not_called()
     rag_service._collection.query.assert_called_once_with(
@@ -99,7 +90,7 @@ async def test_full_graph_without_hyde_skips_generate(rag_service, default_confi
 
 @pytest.mark.asyncio
 async def test_full_graph_default_no_hyde(rag_service, default_config):
-    """When use_hyde is not provided, HyDE is skipped by default."""
+    """When pre_retrieval_strategy is not provided, HyDE is skipped by default."""
     from app.services.rag_graph import create_rag_graph
 
     mock_model = AsyncMock()
@@ -120,7 +111,7 @@ async def test_full_graph_default_no_hyde(rag_service, default_config):
 
 @pytest.mark.asyncio
 async def test_prep_graph_with_hyde(rag_service):
-    """Prep graph with use_hyde=True calls generate_hypothetical_doc."""
+    """Prep graph with pre_retrieval_strategy='hyde' calls generate_hypothetical_doc."""
     from app.services.rag_graph import create_rag_prep_graph
 
     config = AppConfig()
@@ -128,7 +119,7 @@ async def test_prep_graph_with_hyde(rag_service):
     with patch("app.services.rag_graph.generate_hypothetical_doc", new_callable=AsyncMock) as mock_hyde:
         mock_hyde.return_value = "Hypothetical passage about Python."
         graph = create_rag_prep_graph(rag_service, config)
-        result = await graph.ainvoke({"question": "What is Python?", "use_hyde": True})
+        result = await graph.ainvoke({"question": "What is Python?", "pre_retrieval_strategy": "hyde"})
 
     mock_hyde.assert_called_once_with("What is Python?", config)
     rag_service._collection.query.assert_called_once_with(
@@ -140,14 +131,14 @@ async def test_prep_graph_with_hyde(rag_service):
 
 @pytest.mark.asyncio
 async def test_prep_graph_without_hyde(rag_service):
-    """Prep graph with use_hyde=False skips HyDE."""
+    """Prep graph with pre_retrieval_strategy='none' skips HyDE."""
     from app.services.rag_graph import create_rag_prep_graph
 
     config = AppConfig()
 
     with patch("app.services.rag_graph.generate_hypothetical_doc", new_callable=AsyncMock) as mock_hyde:
         graph = create_rag_prep_graph(rag_service, config)
-        result = await graph.ainvoke({"question": "What is Python?", "use_hyde": False})
+        result = await graph.ainvoke({"question": "What is Python?", "pre_retrieval_strategy": "none"})
 
     mock_hyde.assert_not_called()
     rag_service._collection.query.assert_called_once_with(
@@ -168,7 +159,7 @@ async def test_hyde_uses_hypothetical_for_retrieval_but_original_for_prompt(rag_
     with patch("app.services.rag_graph.generate_hypothetical_doc", new_callable=AsyncMock) as mock_hyde:
         mock_hyde.return_value = "Hypothetical doc content."
         graph = create_rag_prep_graph(rag_service, config)
-        result = await graph.ainvoke({"question": "What is Python?", "use_hyde": True})
+        result = await graph.ainvoke({"question": "What is Python?", "pre_retrieval_strategy": "hyde"})
 
     # Retrieval used hypothetical doc
     rag_service._collection.query.assert_called_once_with(
@@ -189,6 +180,6 @@ async def test_hyde_stores_hypothetical_doc_in_state(rag_service, default_config
     with patch("app.services.rag_graph.generate_hypothetical_doc", new_callable=AsyncMock) as mock_hyde:
         mock_hyde.return_value = "Generated hypothetical passage."
         graph = create_rag_prep_graph(rag_service, config)
-        result = await graph.ainvoke({"question": "test", "use_hyde": True})
+        result = await graph.ainvoke({"question": "test", "pre_retrieval_strategy": "hyde"})
 
     assert result.get("hypothetical_doc") == "Generated hypothetical passage."

@@ -75,8 +75,11 @@ async def _chat_stream(question: str, k: int, pack_id: Optional[str] = None) -> 
 
     # Use LangGraph prep graph for retrieve + build_prompt
     prep_graph = create_rag_prep_graph(rag, config)
-    use_hyde = config.pre_retrieval_strategy == "hyde"
-    state_input: dict = {"question": question, "k": k, "use_hyde": use_hyde}
+    state_input: dict = {
+        "question": question,
+        "k": k,
+        "pre_retrieval_strategy": config.pre_retrieval_strategy.value,
+    }
     if pack_id is not None:
         state_input["pack_id"] = pack_id
     prep_result = await prep_graph.ainvoke(state_input)

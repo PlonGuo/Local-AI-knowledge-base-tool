@@ -102,8 +102,8 @@ def test_chat_stream_uses_prep_graph(mock_config, mock_rag, client, mock_rag_ser
 
         # Verify prep graph was created with the rag service and config
         mock_create.assert_called_once_with(mock_rag_service, mock_config.return_value)
-        # Verify graph was invoked with question, k, and use_hyde
-        mock_graph.ainvoke.assert_called_once_with({"question": "test", "k": 5, "use_hyde": False})
+        # Verify graph was invoked with question, k, and pre_retrieval_strategy
+        mock_graph.ainvoke.assert_called_once_with({"question": "test", "k": 5, "pre_retrieval_strategy": "none"})
 
 
 @patch("app.routers.chat._get_rag_service")
@@ -135,7 +135,7 @@ def test_chat_stream_passes_k_to_graph(mock_config, mock_rag, client, mock_rag_s
         resp = client.post("/chat", json={"question": "test", "k": 3})
         assert resp.status_code == 200
 
-        mock_graph.ainvoke.assert_called_once_with({"question": "test", "k": 3, "use_hyde": False})
+        mock_graph.ainvoke.assert_called_once_with({"question": "test", "k": 3, "pre_retrieval_strategy": "none"})
 
 
 @patch("app.routers.chat._get_rag_service")

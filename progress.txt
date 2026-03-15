@@ -229,7 +229,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 
 ### 9A. Config + Routing
 [x] Task 121: AppConfig pre_retrieval_strategy enum + use_reranker + chat_memory_turns (replace use_hyde)
-[ ] Task 122: RAGState + graph routing update (3-way pre-retrieval, update existing tests)
+[x] Task 122: RAGState + graph routing update (3-way pre-retrieval, update existing tests)
 
 ### 9B. Re-ranking
 [ ] Task 123: RerankerService (CrossEncoder download + rerank method)
@@ -249,6 +249,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 [ ] Task 131: Full integration verification (all backend + frontend tests)
 
 === LOG ===
+2026-03-15 — Task 122 complete: Replaced use_hyde bool with pre_retrieval_strategy str in RAGState; replaced _should_hyde() with _pre_retrieval_route() (3-way routing: none→retrieve, hyde→hyde, multi_query→multi_query); added multi_query placeholder node to both create_rag_graph and create_rag_prep_graph; updated chat.py to pass config.pre_retrieval_strategy.value instead of derived use_hyde bool; updated test_rag_graph_hyde.py (7 tests), test_chat_graph_wiring.py (2 assertions), test_chat_api.py (2 tests renamed+updated); created test_rag_graph_routing.py with 13 new tests (state fields, route function, full graph 3-way, prep graph 3-way); all 655/656 backend tests pass (1 pre-existing config test isolation failure).
 2026-03-15 — Task 121 complete: Added PreRetrievalStrategy enum (none/hyde/multi_query) to config.py; replaced use_hyde bool with pre_retrieval_strategy field; added use_reranker (default False) and chat_memory_turns (default 0); load_config() migrates legacy use_hyde YAML to pre_retrieval_strategy; updated chat.py to derive use_hyde from pre_retrieval_strategy; updated test_chat_api.py to use new config fields; 18 new tests in test_config_phase9.py (enum values, defaults, migration, serialization, validation); all 18 pass; 618/619 backend tests pass (1 pre-existing config test isolation failure).
 2026-03-15 — Task 106 complete: Added optional where: dict parameter to RAGService.retrieve(); when provided, passes where kwarg to collection.query() for Chroma metadata filtering; None (default) omits kwarg for full backward compatibility; 4 new tests (with filter, without filter, explicit None, complex $and filter); all 25 RAG service tests pass.
 2026-03-15 — Task 105 complete: Added use_hyde field to AppConfig (default False); updated _chat_stream in chat.py to pass config.use_hyde into prep graph state; 2 new tests (use_hyde=False default skips HyDE, use_hyde=True triggers HyDE and passes hypothetical doc to retrieve); all 14 chat API tests pass.

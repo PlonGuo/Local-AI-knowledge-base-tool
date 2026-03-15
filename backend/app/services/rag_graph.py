@@ -1,4 +1,4 @@
-"""LangGraph RAG StateGraph — optional HyDE → retrieve → build_prompt → generate → END."""
+"""LangGraph RAG StateGraph — 3-way pre-retrieval routing → retrieve → build_prompt → generate → END."""
 from __future__ import annotations
 
 from typing import Any, Literal, TypedDict
@@ -15,7 +15,7 @@ class RAGState(TypedDict, total=False):
 
     question: str
     k: int
-    use_hyde: bool
+    pre_retrieval_strategy: str  # "none" | "hyde" | "multi_query"
     hypothetical_doc: str
     pack_id: str
     chunks: list[dict[str, Any]]
@@ -24,23 +24,30 @@ class RAGState(TypedDict, total=False):
     answer: str
 
 
-def _should_hyde(state: RAGState) -> Literal["hyde", "retrieve"]:
-    """Route to hyde node if use_hyde is True, otherwise skip to retrieve."""
-    if state.get("use_hyde", False):
+def _pre_retrieval_route(state: RAGState) -> Literal["hyde", "multi_query", "retrieve"]:
+    """Route based on pre_retrieval_strategy: hyde, multi_query, or retrieve (default)."""
+    strategy = state.get("pre_retrieval_strategy", "none")
+    if strategy == "hyde":
         return "hyde"
+    if strategy == "multi_query":
+        return "multi_query"
     return "retrieve"
 
 
 def create_rag_graph(rag_service: RAGService, config: AppConfig):
     """Build and compile the RAG StateGraph.
 
-    Nodes: [hyde →] retrieve → build_prompt → generate → END
-    HyDE node runs only when use_hyde=True in input state.
+    Nodes: [hyde|multi_query →] retrieve → build_prompt → generate → END
+    Routing determined by pre_retrieval_strategy in input state.
     """
 
     async def hyde(state: RAGState) -> dict:
         hypothetical = await generate_hypothetical_doc(state["question"], config)
         return {"hypothetical_doc": hypothetical}
+
+    async def multi_query(state: RAGState) -> dict:
+        # Placeholder — will be implemented in Task 127
+        return {}
 
     async def retrieve(state: RAGState) -> dict:
         k = state.get("k", 5)
@@ -63,12 +70,18 @@ def create_rag_graph(rag_service: RAGService, config: AppConfig):
 
     graph = StateGraph(RAGState)
     graph.add_node("hyde", hyde)
+    graph.add_node("multi_query", multi_query)
     graph.add_node("retrieve", retrieve)
     graph.add_node("build_prompt", build_prompt)
     graph.add_node("generate", generate)
 
-    graph.add_conditional_edges("__start__", _should_hyde, {"hyde": "hyde", "retrieve": "retrieve"})
+    graph.add_conditional_edges(
+        "__start__",
+        _pre_retrieval_route,
+        {"hyde": "hyde", "multi_query": "multi_query", "retrieve": "retrieve"},
+    )
     graph.add_edge("hyde", "retrieve")
+    graph.add_edge("multi_query", "retrieve")
     graph.add_edge("retrieve", "build_prompt")
     graph.add_edge("build_prompt", "generate")
     graph.add_edge("generate", END)
@@ -77,16 +90,20 @@ def create_rag_graph(rag_service: RAGService, config: AppConfig):
 
 
 def create_rag_prep_graph(rag_service: RAGService, config: AppConfig | None = None):
-    """Build a prep-only graph: [hyde →] retrieve → build_prompt → END.
+    """Build a prep-only graph: [hyde|multi_query →] retrieve → build_prompt → END.
 
     Returns chunks, sources, and messages without calling the LLM.
     Use this for streaming chat where LLM tokens are streamed separately.
-    Config is required when use_hyde=True.
+    Config is required when pre_retrieval_strategy is 'hyde'.
     """
 
     async def hyde(state: RAGState) -> dict:
         hypothetical = await generate_hypothetical_doc(state["question"], config)
         return {"hypothetical_doc": hypothetical}
+
+    async def multi_query(state: RAGState) -> dict:
+        # Placeholder — will be implemented in Task 127
+        return {}
 
     async def retrieve(state: RAGState) -> dict:
         k = state.get("k", 5)
@@ -105,11 +122,17 @@ def create_rag_prep_graph(rag_service: RAGService, config: AppConfig | None = No
 
     graph = StateGraph(RAGState)
     graph.add_node("hyde", hyde)
+    graph.add_node("multi_query", multi_query)
     graph.add_node("retrieve", retrieve)
     graph.add_node("build_prompt", build_prompt)
 
-    graph.add_conditional_edges("__start__", _should_hyde, {"hyde": "hyde", "retrieve": "retrieve"})
+    graph.add_conditional_edges(
+        "__start__",
+        _pre_retrieval_route,
+        {"hyde": "hyde", "multi_query": "multi_query", "retrieve": "retrieve"},
+    )
     graph.add_edge("hyde", "retrieve")
+    graph.add_edge("multi_query", "retrieve")
     graph.add_edge("retrieve", "build_prompt")
     graph.add_edge("build_prompt", END)
 
