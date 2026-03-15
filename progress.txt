@@ -221,7 +221,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 [x] Task 118: Create eval_dataset_leetcode.json (25-30 Q&A pairs)
 
 ### 8D. Verification
-[ ] Task 119: Ingest verification (25 files indexed, heading-aware chunking, pack_id filter)
+[x] Task 119: Ingest verification (25 files indexed, heading-aware chunking, pack_id filter)
 [ ] Task 120: Full test suite + eval baseline
 
 === LOG ===
