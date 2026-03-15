@@ -208,7 +208,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 Plan: ~/.claude/plans/eventual-skipping-reddy.md
 
 ### 8A. Template Guide + Algorithm Docs
-[ ] Task 112: Create TEMPLATE_GUIDE.md + directory structure (knowledge/leetcode-basics/)
+[x] Task 112: Create TEMPLATE_GUIDE.md + directory structure (knowledge/leetcode-basics/)
 [ ] Task 113: Convert 6 algorithm docs (bfs, dfs, dijkstra, dynamic-programming, interval-dp, digit-dp)
 [ ] Task 114: Convert 6 algorithm docs (rerooting-dp, two-pointer, greedy, heap-priority-queue, difference-array, graph-theory-overview)
 
