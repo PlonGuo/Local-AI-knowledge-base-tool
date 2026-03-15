@@ -217,7 +217,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 [x] Task 116: Convert 6 problem docs (lc-0732, lc-0834, lc-0877, lc-1245, lc-2385, lc-2719)
 
 ### 8C. Company Doc + Eval Dataset
-[ ] Task 117: Convert company doc (rippling.md)
+[x] Task 117: Convert company doc (rippling.md)
 [ ] Task 118: Create eval_dataset_leetcode.json (25-30 Q&A pairs)
 
 ### 8D. Verification
