@@ -6,6 +6,9 @@ interface AppConfig {
   base_url: string
   api_key: string | null
   embedding_language: 'english' | 'chinese' | 'mixed'
+  pre_retrieval_strategy: 'none' | 'hyde' | 'multi_query'
+  use_reranker: boolean
+  chat_memory_turns: number
 }
 
 interface TestResult {
@@ -33,12 +36,28 @@ interface SettingsPageProps {
   onConfigSaved?: () => void
 }
 
+interface RerankerStatus {
+  model: string
+  size_mb: number
+  downloaded: boolean
+  loaded: boolean
+}
+
+interface RerankerDownloadStatus {
+  status: string | null
+  progress?: number
+  error?: string
+}
+
 const defaultConfig: AppConfig = {
   llm_provider: 'ollama',
   model_name: 'llama3',
   base_url: 'http://localhost:11434',
   api_key: null,
   embedding_language: 'english',
+  pre_retrieval_strategy: 'none',
+  use_reranker: false,
+  chat_memory_turns: 0,
 }
 
 export default function SettingsPage({ backendUrl, onBack, onConfigSaved }: SettingsPageProps) {
@@ -52,7 +71,11 @@ export default function SettingsPage({ backendUrl, onBack, onConfigSaved }: Sett
   const [showEmbeddingWarning, setShowEmbeddingWarning] = useState(false)
   const [exportStatus, setExportStatus] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
+  const [rerankerStatus, setRerankerStatus] = useState<RerankerStatus | null>(null)
+  const [rerankerDownloading, setRerankerDownloading] = useState(false)
+  const [rerankerDownloadStatus, setRerankerDownloadStatus] = useState<RerankerDownloadStatus | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const rerankerPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     fetch(`${backendUrl}/config`)
@@ -70,10 +93,20 @@ export default function SettingsPage({ backendUrl, onBack, onConfigSaved }: Sett
       .catch(() => {})
   }, [backendUrl])
 
+  useEffect(() => {
+    fetch(`${backendUrl}/reranker/status`)
+      .then((r) => r.ok ? r.json() : Promise.resolve(null))
+      .then((data: RerankerStatus | null) => {
+        if (data) setRerankerStatus(data)
+      })
+      .catch(() => {})
+  }, [backendUrl])
+
   // Stop polling on unmount
   useEffect(() => {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current)
+      if (rerankerPollRef.current) clearInterval(rerankerPollRef.current)
     }
   }, [])
 
@@ -115,6 +148,40 @@ export default function SettingsPage({ backendUrl, onBack, onConfigSaved }: Sett
       startStatusPolling(config.embedding_language)
     } catch {
       setDownloading(false)
+    }
+  }
+
+  const startRerankerPolling = () => {
+    if (rerankerPollRef.current) clearInterval(rerankerPollRef.current)
+    rerankerPollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`${backendUrl}/reranker/download-status`)
+        const data: RerankerDownloadStatus = await res.json()
+        setRerankerDownloadStatus(data)
+        if (data.status === 'complete' || data.status === 'error') {
+          clearInterval(rerankerPollRef.current!)
+          rerankerPollRef.current = null
+          setRerankerDownloading(false)
+          const statusRes = await fetch(`${backendUrl}/reranker/status`)
+          const status: RerankerStatus = await statusRes.json()
+          setRerankerStatus(status)
+        }
+      } catch {
+        clearInterval(rerankerPollRef.current!)
+        rerankerPollRef.current = null
+        setRerankerDownloading(false)
+      }
+    }, 1000)
+  }
+
+  const handleRerankerDownload = async () => {
+    setRerankerDownloading(true)
+    setRerankerDownloadStatus({ status: 'downloading', progress: 0 })
+    try {
+      await fetch(`${backendUrl}/reranker/download`, { method: 'POST' })
+      startRerankerPolling()
+    } catch {
+      setRerankerDownloading(false)
     }
   }
 
@@ -354,6 +421,111 @@ export default function SettingsPage({ backendUrl, onBack, onConfigSaved }: Sett
               )}
             </div>
           )}
+
+          {/* RAG Settings */}
+          <div className="rounded-md border p-3 space-y-3">
+            <h3 className="text-sm font-medium text-foreground">RAG Settings</h3>
+
+            {/* Pre-retrieval Strategy */}
+            <div>
+              <label className={labelClass}>Pre-retrieval Strategy</label>
+              <select
+                data-testid="pre-retrieval-strategy-select"
+                value={config.pre_retrieval_strategy}
+                onChange={(e) =>
+                  setConfig({
+                    ...config,
+                    pre_retrieval_strategy: e.target.value as AppConfig['pre_retrieval_strategy'],
+                  })
+                }
+                className={selectClass}
+              >
+                <option value="none">None</option>
+                <option value="hyde">HyDE</option>
+                <option value="multi_query">Multi-Query</option>
+              </select>
+            </div>
+
+            {/* Reranker Toggle */}
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-foreground">Use Reranker</label>
+              <button
+                data-testid="reranker-toggle"
+                onClick={() => setConfig({ ...config, use_reranker: !config.use_reranker })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  config.use_reranker ? 'bg-primary' : 'bg-muted'
+                }`}
+                role="switch"
+                aria-checked={config.use_reranker}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    config.use_reranker ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Reranker Model Download */}
+            {config.use_reranker && rerankerStatus && (
+              <div
+                data-testid="reranker-model-section"
+                className="rounded-md border bg-muted/40 p-3 space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    {rerankerStatus.model} — {rerankerStatus.size_mb} MB
+                  </span>
+                  {rerankerStatus.downloaded ? (
+                    <span
+                      data-testid="reranker-ready-indicator"
+                      className="text-xs font-medium text-green-600"
+                    >
+                      ✓ Ready
+                    </span>
+                  ) : (
+                    <button
+                      data-testid="download-reranker-button"
+                      onClick={handleRerankerDownload}
+                      disabled={rerankerDownloading}
+                      className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                    >
+                      {rerankerDownloading ? 'Downloading...' : 'Download'}
+                    </button>
+                  )}
+                </div>
+                {rerankerDownloading && (
+                  <div data-testid="reranker-progress-bar" className="w-full">
+                    <div className="h-1.5 w-full rounded-full bg-muted">
+                      <div
+                        className="h-1.5 rounded-full bg-primary transition-all"
+                        style={{ width: `${Math.round((rerankerDownloadStatus?.progress ?? 0) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Chat Memory Turns */}
+            <div>
+              <label className={labelClass}>Chat Memory Turns</label>
+              <input
+                data-testid="chat-memory-turns-input"
+                type="number"
+                min={0}
+                max={50}
+                value={config.chat_memory_turns}
+                onChange={(e) =>
+                  setConfig({ ...config, chat_memory_turns: Math.max(0, parseInt(e.target.value) || 0) })
+                }
+                className={inputClass}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Number of recent messages to include for context (0 = disabled)
+              </p>
+            </div>
+          </div>
 
           {/* Embedding warning */}
           {showEmbeddingWarning && (
