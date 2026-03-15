@@ -12,6 +12,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.database import get_db
 from app.services.frontmatter_parser import FrontmatterData, parse_frontmatter
+from app.services.heading_chunker import split_by_headings
 from app.services.pdf_extractor import extract_pdf_text
 
 logger = logging.getLogger(__name__)
@@ -176,8 +177,14 @@ class IngestService:
                     if val is not None:
                         chunk_meta[key] = val
 
-                # Split and store
-                chunks = self.split_text(content, metadata=chunk_meta)
+                # Split and store — .md uses heading-aware chunker, .pdf uses fixed split
+                if file_path.suffix.lower() == ".pdf":
+                    chunks = self.split_text(content, metadata=chunk_meta)
+                else:
+                    chunks = split_by_headings(content, metadata=chunk_meta)
+                    # Fallback: if heading chunker returns nothing (empty body), use fixed split
+                    if not chunks:
+                        chunks = self.split_text(content, metadata=chunk_meta)
                 self.store_chunks(chunks)
                 chunk_count = len(chunks)
                 indexed_at = datetime.now().isoformat()

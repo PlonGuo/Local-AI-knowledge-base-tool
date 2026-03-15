@@ -526,3 +526,102 @@ async def test_frontmatter_no_chroma_none_values(service, db, knowledge_dir):
     for meta in chroma_results["metadatas"]:
         for v in meta.values():
             assert v is not None, "Chroma metadata should not contain None values"
+
+
+# ── Heading-aware chunking wiring ────────────────────────────────
+
+
+@pytest.fixture
+def heading_md_dir(tmp_path):
+    """Create a directory with a Markdown file that has multiple headings."""
+    md = tmp_path / "algorithms.md"
+    md.write_text(
+        "# Algorithms\n\n"
+        "An introduction to common algorithms.\n\n"
+        "## Sorting\n\n"
+        "Sorting algorithms arrange elements in order. "
+        "Common examples include bubble sort, merge sort, and quick sort. "
+        "Each has different time complexity characteristics.\n\n"
+        "## Searching\n\n"
+        "Searching algorithms find elements in data structures. "
+        "Binary search is efficient for sorted arrays with O(log n) time.\n\n"
+        "## Graph Algorithms\n\n"
+        "Graph algorithms solve problems on graph structures. "
+        "BFS and DFS are fundamental traversal strategies used widely.\n"
+    )
+    return tmp_path
+
+
+@pytest.mark.asyncio
+async def test_md_uses_heading_chunker(service, db, heading_md_dir):
+    """Ingesting .md should use heading-aware chunking (section_heading in metadata)."""
+    file_path = heading_md_dir / "algorithms.md"
+    result = await service.ingest_file(file_path, heading_md_dir)
+    assert result["status"] == "indexed"
+    assert result["chunk_count"] >= 1
+
+    chroma_results = service.collection.get(where={"file_path": str(file_path)})
+    assert len(chroma_results["ids"]) >= 1
+    # At least one chunk should have section_heading metadata
+    headings = [m.get("section_heading") for m in chroma_results["metadatas"]]
+    assert any(h is not None for h in headings), "Markdown chunks should have section_heading metadata"
+
+
+@pytest.mark.asyncio
+async def test_pdf_uses_fixed_split(service, db, pdf_knowledge_dir):
+    """Ingesting .pdf should use fixed-size split (no section_heading)."""
+    file_path = pdf_knowledge_dir / "document.pdf"
+    result = await service.ingest_file(file_path, pdf_knowledge_dir)
+    assert result["status"] == "indexed"
+
+    chroma_results = service.collection.get(where={"file_path": str(file_path)})
+    assert len(chroma_results["ids"]) >= 1
+    # PDF chunks should NOT have section_heading
+    for meta in chroma_results["metadatas"]:
+        assert "section_heading" not in meta, "PDF chunks should not have section_heading"
+
+
+@pytest.mark.asyncio
+async def test_heading_chunks_have_chunk_index(service, db, heading_md_dir):
+    """Heading-aware chunks should have chunk_index metadata."""
+    file_path = heading_md_dir / "algorithms.md"
+    await service.ingest_file(file_path, heading_md_dir)
+
+    chroma_results = service.collection.get(where={"file_path": str(file_path)})
+    for meta in chroma_results["metadatas"]:
+        assert "chunk_index" in meta, "Each chunk should have chunk_index"
+
+
+@pytest.mark.asyncio
+async def test_heading_chunks_preserve_frontmatter_metadata(service, db, tmp_path):
+    """Heading chunker should preserve frontmatter metadata in Chroma."""
+    md = tmp_path / "with-fm.md"
+    md.write_text(
+        "---\n"
+        "title: Test Doc\n"
+        "category: testing\n"
+        "pack_id: test-pack\n"
+        "---\n"
+        "# Introduction\n\n"
+        "This is the introduction section with enough content to be kept.\n\n"
+        "## Details\n\n"
+        "These are the details section with enough content to be a separate chunk.\n"
+    )
+    await service.ingest_file(md, tmp_path)
+
+    chroma_results = service.collection.get(where={"file_path": str(md)})
+    assert len(chroma_results["ids"]) >= 1
+    for meta in chroma_results["metadatas"]:
+        assert meta["title"] == "Test Doc"
+        assert meta["category"] == "testing"
+        assert meta["pack_id"] == "test-pack"
+
+
+@pytest.mark.asyncio
+async def test_md_no_headings_still_works(service, db, knowledge_dir):
+    """Markdown without headings should still ingest correctly via heading chunker."""
+    no_heading = knowledge_dir / "plain.md"
+    no_heading.write_text("Just some plain text without any headings at all.\n")
+    result = await service.ingest_file(no_heading, knowledge_dir)
+    assert result["status"] == "indexed"
+    assert result["chunk_count"] >= 1
