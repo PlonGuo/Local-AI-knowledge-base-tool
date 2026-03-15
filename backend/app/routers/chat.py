@@ -19,13 +19,15 @@ router = APIRouter()
 # Module-level state, set by init_chat_router()
 _rag_service: Optional[RAGService] = None
 _config_path = None
+_reranker_service = None
 
 
-def init_chat_router(rag_service: RAGService, config_path) -> None:
-    """Initialize chat router with RAG service and config path."""
-    global _rag_service, _config_path
+def init_chat_router(rag_service: RAGService, config_path, reranker_service=None) -> None:
+    """Initialize chat router with RAG service, config path, and optional reranker."""
+    global _rag_service, _config_path, _reranker_service
     _rag_service = rag_service
     _config_path = config_path
+    _reranker_service = reranker_service
 
 
 def _get_rag_service() -> RAGService:
@@ -74,11 +76,12 @@ async def _chat_stream(question: str, k: int, pack_id: Optional[str] = None) -> 
     config = _get_config()
 
     # Use LangGraph prep graph for retrieve + build_prompt
-    prep_graph = create_rag_prep_graph(rag, config)
+    prep_graph = create_rag_prep_graph(rag, config, reranker_service=_reranker_service)
     state_input: dict = {
         "question": question,
         "k": k,
         "pre_retrieval_strategy": config.pre_retrieval_strategy.value,
+        "use_reranker": config.use_reranker,
     }
     if pack_id is not None:
         state_input["pack_id"] = pack_id

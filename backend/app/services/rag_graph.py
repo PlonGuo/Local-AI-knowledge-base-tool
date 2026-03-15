@@ -1,4 +1,4 @@
-"""LangGraph RAG StateGraph — 3-way pre-retrieval routing → retrieve → build_prompt → generate → END."""
+"""LangGraph RAG StateGraph — 3-way pre-retrieval routing → retrieve → [rerank →] build_prompt → generate → END."""
 from __future__ import annotations
 
 from typing import Any, Literal, TypedDict
@@ -16,6 +16,7 @@ class RAGState(TypedDict, total=False):
     question: str
     k: int
     pre_retrieval_strategy: str  # "none" | "hyde" | "multi_query"
+    use_reranker: bool
     hypothetical_doc: str
     pack_id: str
     chunks: list[dict[str, Any]]
@@ -34,11 +35,18 @@ def _pre_retrieval_route(state: RAGState) -> Literal["hyde", "multi_query", "ret
     return "retrieve"
 
 
-def create_rag_graph(rag_service: RAGService, config: AppConfig):
+def _post_retrieve_route(state: RAGState) -> Literal["rerank", "build_prompt"]:
+    """Route after retrieve: rerank if use_reranker is True, else build_prompt."""
+    if state.get("use_reranker", False):
+        return "rerank"
+    return "build_prompt"
+
+
+def create_rag_graph(rag_service: RAGService, config: AppConfig, reranker_service=None):
     """Build and compile the RAG StateGraph.
 
-    Nodes: [hyde|multi_query →] retrieve → build_prompt → generate → END
-    Routing determined by pre_retrieval_strategy in input state.
+    Nodes: [hyde|multi_query →] retrieve → [rerank →] build_prompt → generate → END
+    Routing determined by pre_retrieval_strategy and use_reranker in input state.
     """
 
     async def hyde(state: RAGState) -> dict:
@@ -60,6 +68,13 @@ def create_rag_graph(rag_service: RAGService, config: AppConfig):
         sources = rag_service.extract_sources(chunks)
         return {"chunks": chunks, "sources": sources}
 
+    async def rerank(state: RAGState) -> dict:
+        if reranker_service is None:
+            return {}
+        reranked = reranker_service.rerank(state["question"], state["chunks"])
+        sources = rag_service.extract_sources(reranked)
+        return {"chunks": reranked, "sources": sources}
+
     async def build_prompt(state: RAGState) -> dict:
         messages = rag_service.build_prompt(state["question"], state["chunks"])
         return {"messages": messages}
@@ -72,6 +87,7 @@ def create_rag_graph(rag_service: RAGService, config: AppConfig):
     graph.add_node("hyde", hyde)
     graph.add_node("multi_query", multi_query)
     graph.add_node("retrieve", retrieve)
+    graph.add_node("rerank", rerank)
     graph.add_node("build_prompt", build_prompt)
     graph.add_node("generate", generate)
 
@@ -82,15 +98,20 @@ def create_rag_graph(rag_service: RAGService, config: AppConfig):
     )
     graph.add_edge("hyde", "retrieve")
     graph.add_edge("multi_query", "retrieve")
-    graph.add_edge("retrieve", "build_prompt")
+    graph.add_conditional_edges(
+        "retrieve",
+        _post_retrieve_route,
+        {"rerank": "rerank", "build_prompt": "build_prompt"},
+    )
+    graph.add_edge("rerank", "build_prompt")
     graph.add_edge("build_prompt", "generate")
     graph.add_edge("generate", END)
 
     return graph.compile()
 
 
-def create_rag_prep_graph(rag_service: RAGService, config: AppConfig | None = None):
-    """Build a prep-only graph: [hyde|multi_query →] retrieve → build_prompt → END.
+def create_rag_prep_graph(rag_service: RAGService, config: AppConfig | None = None, reranker_service=None):
+    """Build a prep-only graph: [hyde|multi_query →] retrieve → [rerank →] build_prompt → END.
 
     Returns chunks, sources, and messages without calling the LLM.
     Use this for streaming chat where LLM tokens are streamed separately.
@@ -116,6 +137,13 @@ def create_rag_prep_graph(rag_service: RAGService, config: AppConfig | None = No
         sources = rag_service.extract_sources(chunks)
         return {"chunks": chunks, "sources": sources}
 
+    async def rerank(state: RAGState) -> dict:
+        if reranker_service is None:
+            return {}
+        reranked = reranker_service.rerank(state["question"], state["chunks"])
+        sources = rag_service.extract_sources(reranked)
+        return {"chunks": reranked, "sources": sources}
+
     async def build_prompt(state: RAGState) -> dict:
         messages = rag_service.build_prompt(state["question"], state["chunks"])
         return {"messages": messages}
@@ -124,6 +152,7 @@ def create_rag_prep_graph(rag_service: RAGService, config: AppConfig | None = No
     graph.add_node("hyde", hyde)
     graph.add_node("multi_query", multi_query)
     graph.add_node("retrieve", retrieve)
+    graph.add_node("rerank", rerank)
     graph.add_node("build_prompt", build_prompt)
 
     graph.add_conditional_edges(
@@ -133,7 +162,12 @@ def create_rag_prep_graph(rag_service: RAGService, config: AppConfig | None = No
     )
     graph.add_edge("hyde", "retrieve")
     graph.add_edge("multi_query", "retrieve")
-    graph.add_edge("retrieve", "build_prompt")
+    graph.add_conditional_edges(
+        "retrieve",
+        _post_retrieve_route,
+        {"rerank": "rerank", "build_prompt": "build_prompt"},
+    )
+    graph.add_edge("rerank", "build_prompt")
     graph.add_edge("build_prompt", END)
 
     return graph.compile()

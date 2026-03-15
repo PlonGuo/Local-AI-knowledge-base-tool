@@ -100,7 +100,7 @@ def create_app(
         )
         init_ingest_router(chroma_path=_chroma_path, knowledge_dir=_knowledge_dir)
         init_knowledge_router(knowledge_dir=_knowledge_dir, ingest_service=ingest_service)
-        init_chat_router(rag_service=rag_service, config_path=_config_path)
+        init_chat_router(rag_service=rag_service, config_path=_config_path, reranker_service=reranker_service)
         export_service = ExportService(
             knowledge_dir=Path(_knowledge_dir),
             config_path=_config_path,
