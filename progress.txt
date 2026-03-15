@@ -232,7 +232,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 [x] Task 122: RAGState + graph routing update (3-way pre-retrieval, update existing tests)
 
 ### 9B. Re-ranking
-[ ] Task 123: RerankerService (CrossEncoder download + rerank method)
+[x] Task 123: RerankerService (CrossEncoder download + rerank method)
 [ ] Task 124: Reranker API router (status/download endpoints)
 [ ] Task 125: Rerank node in LangGraph (conditional after retrieve)
 
@@ -249,6 +249,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 [ ] Task 131: Full integration verification (all backend + frontend tests)
 
 === LOG ===
+2026-03-15 — Task 123 complete: app/services/reranker_service.py — RerankerService class with CrossEncoder download/load pattern (like EmbeddingService); RERANKER_MODEL=cross-encoder/ms-marco-MiniLM-L-6-v2 (80MB); download_model() async with progress tracking, load_model() sync, is_model_downloaded() checks local dir, get_status() returns model/size/downloaded/loaded, get_download_status() returns progress dict; rerank(query, chunks, top_k) builds query-doc pairs, calls model.predict(), sorts by score descending, returns top_k with rerank_score field; raises RuntimeError if model not loaded; 19 new tests; all 19 pass.
 2026-03-15 — Task 122 complete: Replaced use_hyde bool with pre_retrieval_strategy str in RAGState; replaced _should_hyde() with _pre_retrieval_route() (3-way routing: none→retrieve, hyde→hyde, multi_query→multi_query); added multi_query placeholder node to both create_rag_graph and create_rag_prep_graph; updated chat.py to pass config.pre_retrieval_strategy.value instead of derived use_hyde bool; updated test_rag_graph_hyde.py (7 tests), test_chat_graph_wiring.py (2 assertions), test_chat_api.py (2 tests renamed+updated); created test_rag_graph_routing.py with 13 new tests (state fields, route function, full graph 3-way, prep graph 3-way); all 655/656 backend tests pass (1 pre-existing config test isolation failure).
 2026-03-15 — Task 121 complete: Added PreRetrievalStrategy enum (none/hyde/multi_query) to config.py; replaced use_hyde bool with pre_retrieval_strategy field; added use_reranker (default False) and chat_memory_turns (default 0); load_config() migrates legacy use_hyde YAML to pre_retrieval_strategy; updated chat.py to derive use_hyde from pre_retrieval_strategy; updated test_chat_api.py to use new config fields; 18 new tests in test_config_phase9.py (enum values, defaults, migration, serialization, validation); all 18 pass; 618/619 backend tests pass (1 pre-existing config test isolation failure).
 2026-03-15 — Task 106 complete: Added optional where: dict parameter to RAGService.retrieve(); when provided, passes where kwarg to collection.query() for Chroma metadata filtering; None (default) omits kwarg for full backward compatibility; 4 new tests (with filter, without filter, explicit None, complex $and filter); all 25 RAG service tests pass.
