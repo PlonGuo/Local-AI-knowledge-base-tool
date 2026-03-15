@@ -17,6 +17,7 @@ class RAGState(TypedDict, total=False):
     k: int
     use_hyde: bool
     hypothetical_doc: str
+    pack_id: str
     chunks: list[dict[str, Any]]
     sources: list[str]
     messages: list[dict[str, str]]
@@ -44,7 +45,11 @@ def create_rag_graph(rag_service: RAGService, config: AppConfig):
     async def retrieve(state: RAGState) -> dict:
         k = state.get("k", 5)
         query = state.get("hypothetical_doc", state["question"])
-        chunks = rag_service.retrieve(query, k=k)
+        pack_id = state.get("pack_id")
+        retrieve_kwargs: dict[str, Any] = {"k": k}
+        if pack_id:
+            retrieve_kwargs["where"] = {"pack_id": pack_id}
+        chunks = rag_service.retrieve(query, **retrieve_kwargs)
         sources = rag_service.extract_sources(chunks)
         return {"chunks": chunks, "sources": sources}
 
@@ -86,7 +91,11 @@ def create_rag_prep_graph(rag_service: RAGService, config: AppConfig | None = No
     async def retrieve(state: RAGState) -> dict:
         k = state.get("k", 5)
         query = state.get("hypothetical_doc", state["question"])
-        chunks = rag_service.retrieve(query, k=k)
+        pack_id = state.get("pack_id")
+        retrieve_kwargs: dict[str, Any] = {"k": k}
+        if pack_id:
+            retrieve_kwargs["where"] = {"pack_id": pack_id}
+        chunks = rag_service.retrieve(query, **retrieve_kwargs)
         sources = rag_service.extract_sources(chunks)
         return {"chunks": chunks, "sources": sources}
 

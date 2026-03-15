@@ -46,6 +46,7 @@ def _get_config() -> AppConfig:
 class ChatRequest(BaseModel):
     question: str
     k: int = 5
+    pack_id: Optional[str] = None
 
     @field_validator("question")
     @classmethod
@@ -67,14 +68,17 @@ class DeleteHistoryResponse(BaseModel):
 # ── SSE streaming ─────────────────────────────────────────────────
 
 
-async def _chat_stream(question: str, k: int) -> AsyncGenerator[str, None]:
+async def _chat_stream(question: str, k: int, pack_id: Optional[str] = None) -> AsyncGenerator[str, None]:
     """Generate SSE events: token, sources, done (or error)."""
     rag = _get_rag_service()
     config = _get_config()
 
     # Use LangGraph prep graph for retrieve + build_prompt
     prep_graph = create_rag_prep_graph(rag, config)
-    prep_result = await prep_graph.ainvoke({"question": question, "k": k, "use_hyde": config.use_hyde})
+    state_input: dict = {"question": question, "k": k, "use_hyde": config.use_hyde}
+    if pack_id is not None:
+        state_input["pack_id"] = pack_id
+    prep_result = await prep_graph.ainvoke(state_input)
     sources = prep_result["sources"]
     messages = prep_result["messages"]
 
@@ -128,7 +132,7 @@ async def _chat_stream(question: str, k: int) -> AsyncGenerator[str, None]:
 async def chat(request: ChatRequest) -> StreamingResponse:
     """SSE streaming chat endpoint."""
     return StreamingResponse(
-        _chat_stream(request.question, request.k),
+        _chat_stream(request.question, request.k, request.pack_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

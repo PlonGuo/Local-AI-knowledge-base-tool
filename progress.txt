@@ -194,7 +194,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 
 ### 7D. Metadata-Filtered Retrieval
 [x] Task 106: Add metadata filter to RAGService.retrieve() (optional where param)
-[ ] Task 107: Add pack_id filter to chat API (optional pack_id in ChatRequest)
+[x] Task 107: Add pack_id filter to chat API (optional pack_id in ChatRequest)
 
 ### 7E. Sample Content + Eval
 [ ] Task 108: Sample knowledge pack (5-10 LeetCode .md files with frontmatter + eval dataset)
@@ -287,3 +287,4 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 2026-03-13 — Task 86 complete: App.tsx fetches /health + /setup/status in parallel on init; renders OnboardingPage when first_run=true, AppLayout otherwise; onComplete sets firstRun=false to reveal main app; 5 new wiring tests (first_run=true shows onboarding, false shows layout, completes to layout, hides after completion); all 265 tests pass; tsc clean.
 2026-03-13 — Task 87 complete: README.md rewritten — features list, prerequisites table, install/dev/test/build instructions, tech stack table, project structure tree.
 2026-03-13 — Task 88 complete: CONTRIBUTING.md written — dev setup, test commands (Vitest + pytest), code style, architecture notes, PR/issue guide.
+2026-03-15 — Task 107 complete: Added optional pack_id field to ChatRequest; pack_id flows through RAGState → retrieve node as where={"pack_id": pack_id} Chroma metadata filter; None/absent pack_id omits where kwarg for full backward compatibility; fixed pre-existing wiring test assertions for use_hyde state field; 3 new tests (with pack_id, without pack_id, null pack_id); all 563/564 backend tests pass (1 pre-existing config test isolation failure).

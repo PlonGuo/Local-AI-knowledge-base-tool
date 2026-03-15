@@ -204,6 +204,62 @@ class TestPostChat:
 
     @patch("app.routers.chat._get_rag_service")
     @patch("app.routers.chat._get_config")
+    def test_chat_with_pack_id_filter(self, mock_config, mock_rag, client, mock_rag_service):
+        """POST /chat with pack_id passes metadata where filter to retrieve."""
+        from app.config import AppConfig
+
+        mock_config.return_value = AppConfig()
+        mock_rag.return_value = mock_rag_service
+
+        async def fake_stream(messages, config):
+            yield "ok"
+
+        mock_rag_service.call_llm_stream = fake_stream
+
+        resp = client.post("/chat", json={"question": "test", "pack_id": "leetcode"})
+        assert resp.status_code == 200
+        mock_rag_service.retrieve.assert_called_once_with(
+            "test", k=5, where={"pack_id": "leetcode"}
+        )
+
+    @patch("app.routers.chat._get_rag_service")
+    @patch("app.routers.chat._get_config")
+    def test_chat_without_pack_id_no_where_filter(self, mock_config, mock_rag, client, mock_rag_service):
+        """POST /chat without pack_id does not pass where filter."""
+        from app.config import AppConfig
+
+        mock_config.return_value = AppConfig()
+        mock_rag.return_value = mock_rag_service
+
+        async def fake_stream(messages, config):
+            yield "ok"
+
+        mock_rag_service.call_llm_stream = fake_stream
+
+        resp = client.post("/chat", json={"question": "test"})
+        assert resp.status_code == 200
+        mock_rag_service.retrieve.assert_called_once_with("test", k=5)
+
+    @patch("app.routers.chat._get_rag_service")
+    @patch("app.routers.chat._get_config")
+    def test_chat_with_pack_id_none_no_where_filter(self, mock_config, mock_rag, client, mock_rag_service):
+        """POST /chat with pack_id=null does not pass where filter."""
+        from app.config import AppConfig
+
+        mock_config.return_value = AppConfig()
+        mock_rag.return_value = mock_rag_service
+
+        async def fake_stream(messages, config):
+            yield "ok"
+
+        mock_rag_service.call_llm_stream = fake_stream
+
+        resp = client.post("/chat", json={"question": "test", "pack_id": None})
+        assert resp.status_code == 200
+        mock_rag_service.retrieve.assert_called_once_with("test", k=5)
+
+    @patch("app.routers.chat._get_rag_service")
+    @patch("app.routers.chat._get_config")
     def test_chat_handles_llm_error(self, mock_config, mock_rag, client, mock_rag_service):
         """POST /chat sends error event if LLM stream fails."""
         from app.config import AppConfig
