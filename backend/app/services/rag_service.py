@@ -8,11 +8,11 @@ from app.services.llm_factory import create_chat_model, dicts_to_messages
 
 logger = logging.getLogger(__name__)
 
-# Langfuse is optional — only used when env vars are set
+# Langfuse LangChain callback — optional, only used when env vars are set
 try:
-    from langfuse import Langfuse
+    from langfuse.langchain import CallbackHandler as LangfuseCallbackHandler
 except ImportError:
-    Langfuse = None
+    LangfuseCallbackHandler = None
 
 SYSTEM_PROMPT = (
     "You are a helpful AI assistant for a personal knowledge base. "
@@ -22,27 +22,26 @@ SYSTEM_PROMPT = (
 )
 
 
+def get_langfuse_callback():
+    """Create a Langfuse LangChain CallbackHandler if env vars are set."""
+    if LangfuseCallbackHandler is None:
+        return None
+    public_key = os.environ.get("LANGFUSE_PUBLIC_KEY")
+    secret_key = os.environ.get("LANGFUSE_SECRET_KEY")
+    if not public_key or not secret_key:
+        return None
+    try:
+        return LangfuseCallbackHandler()
+    except Exception:
+        logger.warning("Failed to create Langfuse callback handler", exc_info=True)
+        return None
+
+
 class RAGService:
     """Chroma retrieval + prompt assembly + LLM call."""
 
     def __init__(self, collection: Any):
         self._collection = collection
-        self._langfuse = self._init_langfuse()
-
-    @staticmethod
-    def _init_langfuse():
-        """Initialize Langfuse client if env vars are set."""
-        if Langfuse is None:
-            return None
-        public_key = os.environ.get("LANGFUSE_PUBLIC_KEY")
-        secret_key = os.environ.get("LANGFUSE_SECRET_KEY")
-        if not public_key or not secret_key:
-            return None
-        try:
-            return Langfuse()
-        except Exception:
-            logger.warning("Failed to initialize Langfuse client", exc_info=True)
-            return None
 
     # ── Retrieval ─────────────────────────────────────────────
 
@@ -105,13 +104,16 @@ class RAGService:
     # ── LLM call ──────────────────────────────────────────────
 
     async def call_llm(
-        self, messages: list[dict[str, str]], config: AppConfig
+        self, messages: list[dict[str, str]], config: AppConfig, callbacks: list | None = None
     ) -> str:
         """Send messages to LLM and return the response text."""
         try:
             model = create_chat_model(config)
             lc_messages = dicts_to_messages(messages)
-            response = await model.ainvoke(lc_messages)
+            invoke_kwargs = {}
+            if callbacks:
+                invoke_kwargs["config"] = {"callbacks": callbacks}
+            response = await model.ainvoke(lc_messages, **invoke_kwargs)
             return response.content
         except Exception as e:
             if "connect" in str(e).lower() or "connection" in str(e).lower():
@@ -121,13 +123,16 @@ class RAGService:
     # ── LLM streaming call ─────────────────────────────────────
 
     async def call_llm_stream(
-        self, messages: list[dict[str, str]], config: AppConfig
+        self, messages: list[dict[str, str]], config: AppConfig, callbacks: list | None = None
     ) -> AsyncGenerator[str, None]:
         """Stream tokens from LLM. Yields individual content tokens."""
         try:
             model = create_chat_model(config)
             lc_messages = dicts_to_messages(messages)
-            async for chunk in model.astream(lc_messages):
+            stream_kwargs = {}
+            if callbacks:
+                stream_kwargs["config"] = {"callbacks": callbacks}
+            async for chunk in model.astream(lc_messages, **stream_kwargs):
                 if chunk.content:
                     yield chunk.content
         except Exception as e:
@@ -141,66 +146,15 @@ class RAGService:
         self, question: str, config: AppConfig, k: int = 5
     ) -> dict[str, Any]:
         """Full RAG pipeline: retrieve → build_prompt → call_llm → return answer + sources."""
-        trace = None
-        if self._langfuse:
-            try:
-                trace = self._langfuse.trace(
-                    name="rag-query",
-                    input=question,
-                    metadata={"k": k, "provider": config.llm_provider.value},
-                )
-            except Exception:
-                logger.warning("Langfuse trace creation failed", exc_info=True)
-
-        # Retrieval
-        retrieval_span = None
-        if trace:
-            try:
-                retrieval_span = trace.span(
-                    name="retrieval",
-                    input={"query": question, "k": k},
-                )
-            except Exception:
-                logger.warning("Langfuse retrieval span failed", exc_info=True)
+        # Build Langfuse callback if env vars are set
+        callbacks = []
+        langfuse_cb = get_langfuse_callback()
+        if langfuse_cb:
+            callbacks.append(langfuse_cb)
 
         chunks = self.retrieve(question, k=k)
         sources = self.extract_sources(chunks)
-
-        if retrieval_span:
-            try:
-                retrieval_span.end(output={"num_chunks": len(chunks), "sources": sources})
-            except Exception:
-                logger.warning("Langfuse retrieval span end failed", exc_info=True)
-
-        # Prompt assembly
         messages = self.build_prompt(question, chunks)
-
-        # LLM call
-        generation = None
-        if trace:
-            try:
-                generation = trace.generation(
-                    name="llm-call",
-                    model=config.model_name,
-                    input=messages,
-                    metadata={"provider": config.llm_provider.value},
-                )
-            except Exception:
-                logger.warning("Langfuse generation creation failed", exc_info=True)
-
-        answer = await self.call_llm(messages, config)
-
-        if generation:
-            try:
-                generation.end(output=answer)
-            except Exception:
-                logger.warning("Langfuse generation end failed", exc_info=True)
-
-        # Finalize trace
-        if trace:
-            try:
-                trace.update(output={"answer": answer, "sources": sources})
-            except Exception:
-                logger.warning("Langfuse trace update failed", exc_info=True)
+        answer = await self.call_llm(messages, config, callbacks=callbacks or None)
 
         return {"answer": answer, "sources": sources}
