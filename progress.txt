@@ -210,7 +210,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 ### 8A. Template Guide + Algorithm Docs
 [x] Task 112: Create TEMPLATE_GUIDE.md + directory structure (knowledge/leetcode-basics/)
 [x] Task 113: Convert 6 algorithm docs (bfs, dfs, dijkstra, dynamic-programming, interval-dp, digit-dp)
-[ ] Task 114: Convert 6 algorithm docs (rerooting-dp, two-pointer, greedy, heap-priority-queue, difference-array, graph-theory-overview)
+[x] Task 114: Convert 6 algorithm docs (rerooting-dp, two-pointer, greedy, heap-priority-queue, difference-array, graph-theory-overview)
 
 ### 8B. Problem Docs
 [ ] Task 115: Convert 6 problem docs (lc-0233, lc-0253, lc-0310, lc-0312, lc-0486, lc-0600)
