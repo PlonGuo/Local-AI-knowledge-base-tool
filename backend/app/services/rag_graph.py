@@ -7,6 +7,7 @@ from langgraph.graph import END, StateGraph
 
 from app.config import AppConfig
 from app.services.hyde_service import generate_hypothetical_doc
+from app.services.multi_query_service import expand_queries
 from app.services.rag_service import RAGService
 
 
@@ -42,11 +43,23 @@ def _post_retrieve_route(state: RAGState) -> Literal["rerank", "build_prompt"]:
     return "build_prompt"
 
 
+def _dedup_chunks(chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Deduplicate chunks by (file_path, chunk_index), preserving order."""
+    seen: set[tuple[str, int]] = set()
+    result = []
+    for chunk in chunks:
+        key = (chunk["file_path"], chunk["chunk_index"])
+        if key not in seen:
+            seen.add(key)
+            result.append(chunk)
+    return result
+
+
 def create_rag_graph(rag_service: RAGService, config: AppConfig, reranker_service=None):
     """Build and compile the RAG StateGraph.
 
     Nodes: [hyde|multi_query →] retrieve → [rerank →] build_prompt → generate → END
-    Routing determined by pre_retrieval_strategy and use_reranker in input state.
+    multi_query does its own retrieval (expand + retrieve per variant + merge/dedup).
     """
 
     async def hyde(state: RAGState) -> dict:
@@ -54,8 +67,19 @@ def create_rag_graph(rag_service: RAGService, config: AppConfig, reranker_servic
         return {"hypothetical_doc": hypothetical}
 
     async def multi_query(state: RAGState) -> dict:
-        # Placeholder — will be implemented in Task 127
-        return {}
+        k = state.get("k", 5)
+        pack_id = state.get("pack_id")
+        variants = await expand_queries(state["question"], config)
+        all_chunks: list[dict[str, Any]] = []
+        for variant in variants:
+            retrieve_kwargs: dict[str, Any] = {"k": k}
+            if pack_id:
+                retrieve_kwargs["where"] = {"pack_id": pack_id}
+            chunks = rag_service.retrieve(variant, **retrieve_kwargs)
+            all_chunks.extend(chunks)
+        deduped = _dedup_chunks(all_chunks)
+        sources = rag_service.extract_sources(deduped)
+        return {"chunks": deduped, "sources": sources}
 
     async def retrieve(state: RAGState) -> dict:
         k = state.get("k", 5)
@@ -97,7 +121,11 @@ def create_rag_graph(rag_service: RAGService, config: AppConfig, reranker_servic
         {"hyde": "hyde", "multi_query": "multi_query", "retrieve": "retrieve"},
     )
     graph.add_edge("hyde", "retrieve")
-    graph.add_edge("multi_query", "retrieve")
+    graph.add_conditional_edges(
+        "multi_query",
+        _post_retrieve_route,
+        {"rerank": "rerank", "build_prompt": "build_prompt"},
+    )
     graph.add_conditional_edges(
         "retrieve",
         _post_retrieve_route,
@@ -114,8 +142,7 @@ def create_rag_prep_graph(rag_service: RAGService, config: AppConfig | None = No
     """Build a prep-only graph: [hyde|multi_query →] retrieve → [rerank →] build_prompt → END.
 
     Returns chunks, sources, and messages without calling the LLM.
-    Use this for streaming chat where LLM tokens are streamed separately.
-    Config is required when pre_retrieval_strategy is 'hyde'.
+    multi_query does its own retrieval (expand + retrieve per variant + merge/dedup).
     """
 
     async def hyde(state: RAGState) -> dict:
@@ -123,8 +150,19 @@ def create_rag_prep_graph(rag_service: RAGService, config: AppConfig | None = No
         return {"hypothetical_doc": hypothetical}
 
     async def multi_query(state: RAGState) -> dict:
-        # Placeholder — will be implemented in Task 127
-        return {}
+        k = state.get("k", 5)
+        pack_id = state.get("pack_id")
+        variants = await expand_queries(state["question"], config)
+        all_chunks: list[dict[str, Any]] = []
+        for variant in variants:
+            retrieve_kwargs: dict[str, Any] = {"k": k}
+            if pack_id:
+                retrieve_kwargs["where"] = {"pack_id": pack_id}
+            chunks = rag_service.retrieve(variant, **retrieve_kwargs)
+            all_chunks.extend(chunks)
+        deduped = _dedup_chunks(all_chunks)
+        sources = rag_service.extract_sources(deduped)
+        return {"chunks": deduped, "sources": sources}
 
     async def retrieve(state: RAGState) -> dict:
         k = state.get("k", 5)
@@ -161,7 +199,11 @@ def create_rag_prep_graph(rag_service: RAGService, config: AppConfig | None = No
         {"hyde": "hyde", "multi_query": "multi_query", "retrieve": "retrieve"},
     )
     graph.add_edge("hyde", "retrieve")
-    graph.add_edge("multi_query", "retrieve")
+    graph.add_conditional_edges(
+        "multi_query",
+        _post_retrieve_route,
+        {"rerank": "rerank", "build_prompt": "build_prompt"},
+    )
     graph.add_conditional_edges(
         "retrieve",
         _post_retrieve_route,
