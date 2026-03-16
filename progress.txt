@@ -275,7 +275,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 [x] Task 139: Add AUTO + AUTO_LLM to PreRetrievalStrategy enum
 
 ### 11B. Rule-based Classifier
-[ ] Task 140: Create strategy_classifier.py with classify_query() — EN + CN heuristics
+[x] Task 140: Create strategy_classifier.py with classify_query() — EN + CN heuristics
 
 ### 11C. LLM-based Classifier
 [ ] Task 141: Add classify_query_llm() to strategy_classifier.py — LLM classification
