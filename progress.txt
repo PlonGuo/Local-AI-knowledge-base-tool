@@ -256,7 +256,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 [x] Task 133: memory_compression_threshold config field (default 20, 0=disabled)
 
 ### 10B. Compression Service
-[ ] Task 134: Memory compression service — summarize_messages() LLM function
+[x] Task 134: Memory compression service — summarize_messages() LLM function
 [ ] Task 135: Memory compression service — compress_if_needed() orchestrator
 
 ### 10C. Query Rewriter Integration
