@@ -46,6 +46,14 @@ CREATE TABLE IF NOT EXISTS ingest_tasks (
     completed_at    TEXT
 );
 
+CREATE TABLE IF NOT EXISTS chat_summaries (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    summary           TEXT NOT NULL,
+    first_message_id  INTEGER NOT NULL,
+    last_message_id   INTEGER NOT NULL,
+    created_at        TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS summaries (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     file_path       TEXT NOT NULL UNIQUE,

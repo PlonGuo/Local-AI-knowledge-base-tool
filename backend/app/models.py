@@ -82,6 +82,23 @@ class ChatMessage(BaseModel):
     created_at: str
 
 
+# ── Chat Summaries ──────────────────────────────────────────────
+
+
+class ChatSummaryCreate(BaseModel):
+    summary: str
+    first_message_id: int
+    last_message_id: int
+
+
+class ChatSummary(BaseModel):
+    id: int
+    summary: str
+    first_message_id: int
+    last_message_id: int
+    created_at: str
+
+
 # ── Ingest Tasks ─────────────────────────────────────────────────
 
 

@@ -252,7 +252,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 Plan: ~/.claude/plans/eventual-skipping-reddy.md
 
 ### 10A. Database + Config
-[ ] Task 132: chat_summaries table in database.py (CREATE TABLE IF NOT EXISTS)
+[x] Task 132: chat_summaries table in database.py (CREATE TABLE IF NOT EXISTS)
 [ ] Task 133: memory_compression_threshold config field (default 20, 0=disabled)
 
 ### 10B. Compression Service

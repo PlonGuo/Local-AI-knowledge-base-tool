@@ -13,6 +13,8 @@ from app.models import (
     ChatMessage,
     ChatMessageCreate,
     ChatMessageRole,
+    ChatSummary,
+    ChatSummaryCreate,
     IngestTask,
     IngestTaskCreate,
     IngestTaskStatus,
@@ -408,3 +410,115 @@ def test_document_model_with_frontmatter():
     )
     assert doc.title == "Two Sum"
     assert doc.difficulty == "easy"
+
+
+# ── chat_summaries table ───────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_chat_summaries_table_exists(db):
+    """chat_summaries table should be created by init_db."""
+    cursor = await db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='chat_summaries'"
+    )
+    row = await cursor.fetchone()
+    assert row is not None
+
+
+@pytest.mark.asyncio
+async def test_chat_summaries_columns(db):
+    """chat_summaries should have id, summary, first_message_id, last_message_id, created_at."""
+    cursor = await db.execute("PRAGMA table_info(chat_summaries)")
+    columns = {row[1] for row in await cursor.fetchall()}
+    assert "id" in columns
+    assert "summary" in columns
+    assert "first_message_id" in columns
+    assert "last_message_id" in columns
+    assert "created_at" in columns
+
+
+@pytest.mark.asyncio
+async def test_insert_and_read_chat_summary(db):
+    """Can insert and read a chat summary row."""
+    await db.execute(
+        """INSERT INTO chat_summaries (summary, first_message_id, last_message_id)
+           VALUES (?, ?, ?)""",
+        ("User asked about arrays. Assistant explained indexing.", 1, 10),
+    )
+    await db.commit()
+
+    cursor = await db.execute("SELECT * FROM chat_summaries ORDER BY id DESC LIMIT 1")
+    row = await cursor.fetchone()
+    assert row is not None
+    assert row["summary"] == "User asked about arrays. Assistant explained indexing."
+    assert row["first_message_id"] == 1
+    assert row["last_message_id"] == 10
+    assert row["created_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_chat_summaries_multiple_rows(db):
+    """Can insert multiple summary rows (layered compression)."""
+    await db.execute(
+        """INSERT INTO chat_summaries (summary, first_message_id, last_message_id)
+           VALUES (?, ?, ?)""",
+        ("Summary of messages 1-10", 1, 10),
+    )
+    await db.execute(
+        """INSERT INTO chat_summaries (summary, first_message_id, last_message_id)
+           VALUES (?, ?, ?)""",
+        ("Summary of messages 11-20", 11, 20),
+    )
+    await db.commit()
+
+    cursor = await db.execute("SELECT COUNT(*) as cnt FROM chat_summaries")
+    row = await cursor.fetchone()
+    assert row["cnt"] == 2
+
+
+@pytest.mark.asyncio
+async def test_chat_summaries_autoincrement_id(db):
+    """id should auto-increment."""
+    await db.execute(
+        """INSERT INTO chat_summaries (summary, first_message_id, last_message_id)
+           VALUES (?, ?, ?)""",
+        ("First summary", 1, 5),
+    )
+    await db.execute(
+        """INSERT INTO chat_summaries (summary, first_message_id, last_message_id)
+           VALUES (?, ?, ?)""",
+        ("Second summary", 6, 10),
+    )
+    await db.commit()
+
+    cursor = await db.execute("SELECT id FROM chat_summaries ORDER BY id")
+    rows = await cursor.fetchall()
+    assert rows[0]["id"] == 1
+    assert rows[1]["id"] == 2
+
+
+# ── Pydantic model — ChatSummary ───────────────────────────────
+
+
+def test_chat_summary_create_model():
+    summary = ChatSummaryCreate(
+        summary="User discussed arrays.",
+        first_message_id=1,
+        last_message_id=10,
+    )
+    assert summary.summary == "User discussed arrays."
+    assert summary.first_message_id == 1
+    assert summary.last_message_id == 10
+
+
+def test_chat_summary_model():
+    summary = ChatSummary(
+        id=1,
+        summary="User discussed arrays.",
+        first_message_id=1,
+        last_message_id=10,
+        created_at="2026-03-15T00:00:00",
+    )
+    assert summary.id == 1
+    assert summary.first_message_id == 1
+    assert summary.last_message_id == 10
