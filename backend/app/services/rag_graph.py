@@ -23,6 +23,7 @@ class RAGState(TypedDict, total=False):
     chat_memory_turns: int
     hypothetical_doc: str
     pack_id: str
+    custom_system_prompt: str
     chunks: list[dict[str, Any]]
     sources: list[str]
     messages: list[dict[str, str]]
@@ -125,7 +126,11 @@ def _build_graph_nodes(rag_service, config, reranker_service=None):
         return {"chunks": reranked, "sources": sources}
 
     async def build_prompt(state: RAGState) -> dict:
-        messages = rag_service.build_prompt(state["question"], state["chunks"])
+        messages = rag_service.build_prompt(
+            state["question"],
+            state["chunks"],
+            custom_system_prompt=state.get("custom_system_prompt", ""),
+        )
         return {"messages": messages}
 
     return rewrite_query_node, route_pre_retrieval, hyde, multi_query, retrieve, rerank, build_prompt

@@ -73,7 +73,7 @@ async def run_rag_pipeline(
     """
     chunks = rag_service.retrieve(question, k=k)
     contexts = [c["content"] for c in chunks]
-    messages = rag_service.build_prompt(question, chunks)
+    messages = rag_service.build_prompt(question, chunks, custom_system_prompt=config.custom_system_prompt)
     answer = await rag_service.call_llm(messages, config)
     return {"answer": answer, "contexts": contexts}
 

@@ -79,7 +79,9 @@ class RAGService:
 
     @staticmethod
     def build_prompt(
-        question: str, chunks: list[dict[str, Any]]
+        question: str,
+        chunks: list[dict[str, Any]],
+        custom_system_prompt: str = "",
     ) -> list[dict[str, str]]:
         """Build chat messages with system prompt, context, and user question."""
         if chunks:
@@ -99,8 +101,12 @@ class RAGService:
                 f"Question: {question}"
             )
 
+        system_content = SYSTEM_PROMPT
+        if custom_system_prompt:
+            system_content = f"{SYSTEM_PROMPT}\n\n{custom_system_prompt}"
+
         return [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_content},
             {"role": "user", "content": user_content},
         ]
 

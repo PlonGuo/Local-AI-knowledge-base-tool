@@ -230,6 +230,26 @@ def test_build_prompt_no_context(rag_service):
     assert "no relevant" in user_msg.lower() or "no context" in user_msg.lower()
 
 
+def test_build_prompt_with_custom_system_prompt(rag_service):
+    """build_prompt() appends custom_system_prompt to system message."""
+    chunks = [{"content": "Some info.", "file_path": "a.md", "chunk_index": 0}]
+    messages = rag_service.build_prompt(
+        "What?", chunks, custom_system_prompt="Always respond in Spanish."
+    )
+    system_msg = messages[0]["content"]
+    assert "Always respond in Spanish." in system_msg
+    # Base system prompt should still be present
+    assert "knowledge base" in system_msg.lower()
+
+
+def test_build_prompt_empty_custom_system_prompt(rag_service):
+    """build_prompt() with empty custom_system_prompt does not alter system message."""
+    chunks = [{"content": "Info.", "file_path": "a.md", "chunk_index": 0}]
+    messages_default = rag_service.build_prompt("Q?", chunks)
+    messages_empty = rag_service.build_prompt("Q?", chunks, custom_system_prompt="")
+    assert messages_default[0]["content"] == messages_empty[0]["content"]
+
+
 # ── LLM call (via LangChain) ────────────────────────────────
 
 

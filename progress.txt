@@ -295,7 +295,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 [x] Task 145: Add custom_system_prompt: str = "" to AppConfig
 
 ### 12B. Prompt Integration
-[ ] Task 146: Update RAGService.build_prompt() to append custom_system_prompt to system message
+[x] Task 146: Update RAGService.build_prompt() to append custom_system_prompt to system message
 
 ### 12C. Frontend
 [ ] Task 147: Add "Custom Instructions" text area to Settings page
