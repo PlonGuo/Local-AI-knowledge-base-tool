@@ -14,6 +14,7 @@ const fullConfig = {
   pre_retrieval_strategy: 'none',
   use_reranker: false,
   chat_memory_turns: 0,
+  custom_system_prompt: '',
 }
 
 const rerankerStatus = {
@@ -228,6 +229,66 @@ describe('Phase 9 Settings', () => {
     await waitFor(() => {
       const select = screen.getAllByTestId('pre-retrieval-strategy-select')[0] as HTMLSelectElement
       fireEvent.change(select, { target: { value: 'auto_llm' } })
+    })
+    const saveBtn = await waitFor(() => screen.getAllByTestId('save-button')[0])
+    fireEvent.click(saveBtn)
+    await waitFor(() => {
+      const putCalls = fetchSpy.mock.calls.filter(
+        ([url, opts]: any[]) => url.includes('/config') && opts?.method === 'PUT'
+      )
+      expect(putCalls.length).toBeGreaterThan(0)
+    })
+  })
+
+  it('renders custom instructions textarea', async () => {
+    render(<SettingsPage backendUrl={BACKEND} />)
+    await waitFor(() => {
+      const elems = screen.getAllByTestId('custom-system-prompt-input')
+      expect(elems.length).toBeGreaterThan(0)
+    })
+  })
+
+  it('loads custom_system_prompt from config', async () => {
+    vi.stubGlobal('fetch', mockFetch({ ...fullConfig, custom_system_prompt: 'Be concise.' }))
+    render(<SettingsPage backendUrl={BACKEND} />)
+    await waitFor(() => {
+      const textarea = screen.getAllByTestId('custom-system-prompt-input')[0] as HTMLTextAreaElement
+      expect(textarea.value).toBe('Be concise.')
+    })
+  })
+
+  it('changes custom instructions on input', async () => {
+    render(<SettingsPage backendUrl={BACKEND} />)
+    await waitFor(() => {
+      const textarea = screen.getAllByTestId('custom-system-prompt-input')[0] as HTMLTextAreaElement
+      fireEvent.change(textarea, { target: { value: 'Respond in Spanish.' } })
+      expect(textarea.value).toBe('Respond in Spanish.')
+    })
+  })
+
+  it('saves custom_system_prompt in config', async () => {
+    const fetchSpy = vi.fn((url: string, options?: any) => {
+      if (url.includes('/config') && options?.method === 'PUT') {
+        const body = JSON.parse(options.body)
+        expect(body.custom_system_prompt).toBe('My custom prompt')
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+      }
+      if (url.includes('/config')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(fullConfig) })
+      }
+      if (url.includes('/embedding/models')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+      }
+      if (url.includes('/reranker/status')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(rerankerStatus) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+    })
+    vi.stubGlobal('fetch', fetchSpy)
+    render(<SettingsPage backendUrl={BACKEND} />)
+    await waitFor(() => {
+      const textarea = screen.getAllByTestId('custom-system-prompt-input')[0] as HTMLTextAreaElement
+      fireEvent.change(textarea, { target: { value: 'My custom prompt' } })
     })
     const saveBtn = await waitFor(() => screen.getAllByTestId('save-button')[0])
     fireEvent.click(saveBtn)

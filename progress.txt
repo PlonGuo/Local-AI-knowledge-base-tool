@@ -298,7 +298,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 [x] Task 146: Update RAGService.build_prompt() to append custom_system_prompt to system message
 
 ### 12C. Frontend
-[ ] Task 147: Add "Custom Instructions" text area to Settings page
+[x] Task 147: Add "Custom Instructions" text area to Settings page
 
 ### 12D. Verification
 [ ] Task 148: Full test suite pass (all backend + frontend tests)

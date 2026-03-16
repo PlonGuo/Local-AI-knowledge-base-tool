@@ -9,6 +9,7 @@ interface AppConfig {
   pre_retrieval_strategy: 'none' | 'hyde' | 'multi_query' | 'auto' | 'auto_llm'
   use_reranker: boolean
   chat_memory_turns: number
+  custom_system_prompt: string
 }
 
 interface TestResult {
@@ -58,6 +59,7 @@ const defaultConfig: AppConfig = {
   pre_retrieval_strategy: 'none',
   use_reranker: false,
   chat_memory_turns: 0,
+  custom_system_prompt: '',
 }
 
 export default function SettingsPage({ backendUrl, onBack, onConfigSaved }: SettingsPageProps) {
@@ -525,6 +527,24 @@ export default function SettingsPage({ backendUrl, onBack, onConfigSaved }: Sett
               />
               <p className="mt-1 text-xs text-muted-foreground">
                 Number of recent messages to include for context (0 = disabled)
+              </p>
+            </div>
+
+            {/* Custom Instructions */}
+            <div>
+              <label className={labelClass}>Custom Instructions</label>
+              <textarea
+                data-testid="custom-system-prompt-input"
+                value={config.custom_system_prompt}
+                onChange={(e) =>
+                  setConfig({ ...config, custom_system_prompt: e.target.value })
+                }
+                placeholder="Add custom instructions for the AI assistant (e.g., response style, domain expertise, language preferences)..."
+                rows={4}
+                className={inputClass + ' resize-y'}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Additional instructions appended to the system prompt. Leave empty to use defaults.
               </p>
             </div>
           </div>
