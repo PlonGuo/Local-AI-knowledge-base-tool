@@ -257,7 +257,7 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 
 ### 10B. Compression Service
 [x] Task 134: Memory compression service — summarize_messages() LLM function
-[ ] Task 135: Memory compression service — compress_if_needed() orchestrator
+[x] Task 135: Memory compression service — compress_if_needed() orchestrator
 
 ### 10C. Query Rewriter Integration
 [ ] Task 136: fetch_chat_context() + updated rewrite_query() with summary support
