@@ -262,3 +262,25 @@ Two "auto" modes: rule-based (free, fast) and LLM-based (accurate, extra API cal
 ### 11F. Verification
 
 - [ ] Task 144: Full integration verification — all backend + frontend tests pass — verified by: `cd backend && uv run pytest -v && cd .. && pnpm vitest run`
+
+---
+
+## Phase 12: User Custom System Prompt
+
+User-editable system prompt (like Claude Desktop's "Project Instructions"). Appended to base system prompt — no conflict since they serve different roles (base = RAG behavior, user = persona/domain/style).
+
+### 12A. Config
+
+- [ ] Task 145: Add `custom_system_prompt: str = ""` to `AppConfig` — empty string default, YAML roundtrip — verified by: `cd backend && uv run pytest tests/test_config_phase9.py -v`
+
+### 12B. Prompt Integration
+
+- [ ] Task 146: Update `RAGService.build_prompt()` to accept `custom_system_prompt` param and append to system message when non-empty; update `build_prompt` node in `rag_graph.py` to pass config value; update eval_ragas.py if needed — verified by: `cd backend && uv run pytest tests/test_rag_service.py -v`
+
+### 12C. Frontend
+
+- [ ] Task 147: Add "Custom Instructions" text area to Settings page (below Chat Memory Turns), with placeholder text, saves via existing PUT /config — verified by: `pnpm vitest run`
+
+### 12D. Verification
+
+- [ ] Task 148: Full test suite pass — verified by: `cd backend && uv run pytest -v && cd .. && pnpm vitest run`

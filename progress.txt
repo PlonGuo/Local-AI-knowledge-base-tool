@@ -289,6 +289,20 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 ### 11F. Verification
 [x] Task 144: Full integration verification (all backend + frontend tests)
 
+## Phase 12: User Custom System Prompt
+
+### 12A. Config
+[ ] Task 145: Add custom_system_prompt: str = "" to AppConfig
+
+### 12B. Prompt Integration
+[ ] Task 146: Update RAGService.build_prompt() to append custom_system_prompt to system message
+
+### 12C. Frontend
+[ ] Task 147: Add "Custom Instructions" text area to Settings page
+
+### 12D. Verification
+[ ] Task 148: Full test suite pass (all backend + frontend tests)
+
 === LOG ===
 2026-03-15 — Task 144 complete: Full integration verification — 870/871 backend tests pass (1 pre-existing config test isolation failure), 283/283 frontend tests pass, 31/31 test files pass. Phase 11 Auto Pre-Retrieval Strategy Selection complete.
 2026-03-15 — Task 143 complete: Added Auto and Auto (LLM) options to pre-retrieval strategy dropdown in SettingsPage.tsx; updated AppConfig interface with 'auto' | 'auto_llm' union types; each option includes trade-off description text (Auto: rule-based/fast/no LLM call; Auto LLM: LLM picks strategy/slower/more accurate); 5 new tests in settings-phase9.test.tsx (load auto, load auto_llm, switch to auto, trade-off descriptions in option text, save auto_llm); all 18 settings-phase9 tests pass; all 283 frontend tests pass (31/31 test files).
