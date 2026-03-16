@@ -206,3 +206,29 @@ pnpm dev:all  # manual: verify Electron window shows {"status":"ok"}
 
 - [ ] Task 130: Frontend settings — pre_retrieval_strategy dropdown (None/HyDE/Multi-Query), reranker toggle + download button, chat_memory_turns input — verified by: `cd .. && pnpm vitest run tests/src/settings-phase9.test.tsx`
 - [ ] Task 131: Full integration verification — all backend + frontend tests pass — verified by: `cd backend && uv run pytest -v && cd .. && pnpm vitest run`
+
+---
+
+## Phase 10: Layered Conversation Memory
+
+### 10A. Database + Config
+
+- [ ] Task 132: `chat_summaries` table in database.py — CREATE TABLE IF NOT EXISTS with columns: id, summary, first_message_id, last_message_id, created_at — verified by: `cd backend && uv run pytest tests/test_database.py -v -k "chat_summaries"`
+- [ ] Task 133: `memory_compression_threshold` config field (default 20, 0=disabled) in AppConfig — verified by: `cd backend && uv run pytest tests/test_config_phase10.py -v`
+
+### 10B. Compression Service
+
+- [ ] Task 134: `summarize_messages()` LLM function in `memory_compression_service.py` — uses create_chat_model pattern, free-form summary, fallback on error — verified by: `cd backend && uv run pytest tests/test_memory_compression_service.py -v -k "summarize"`
+- [ ] Task 135: `compress_if_needed()` orchestrator — watermark via MAX(last_message_id), threshold check, INSERT summary row — verified by: `cd backend && uv run pytest tests/test_memory_compression_service.py -v`
+
+### 10C. Query Rewriter Integration
+
+- [ ] Task 136: `fetch_chat_context()` returns (summaries, recent_messages), update `rewrite_query()` to accept optional summaries, update rewrite prompt, update `rewrite_query_node` in rag_graph.py — verified by: `cd backend && uv run pytest tests/test_query_rewriter.py -v`
+
+### 10D. Chat Router Integration
+
+- [ ] Task 137: Trigger `compress_if_needed()` via asyncio.create_task after assistant response saved, clear chat_summaries on DELETE /chat/history — verified by: `cd backend && uv run pytest tests/test_chat_api.py tests/test_chat_graph_wiring.py -v`
+
+### 10E. Verification
+
+- [ ] Task 138: Full integration verification — all backend + frontend tests pass — verified by: `cd backend && uv run pytest -v && cd .. && pnpm vitest run`

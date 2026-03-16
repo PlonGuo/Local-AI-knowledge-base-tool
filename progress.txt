@@ -248,6 +248,26 @@ Plan: ~/.claude/plans/eventual-skipping-reddy.md
 [x] Task 130: Frontend settings (strategy dropdown, reranker toggle+download, memory turns)
 [x] Task 131: Full integration verification (all backend + frontend tests)
 
+## Phase 10: Layered Conversation Memory
+Plan: ~/.claude/plans/eventual-skipping-reddy.md
+
+### 10A. Database + Config
+[ ] Task 132: chat_summaries table in database.py (CREATE TABLE IF NOT EXISTS)
+[ ] Task 133: memory_compression_threshold config field (default 20, 0=disabled)
+
+### 10B. Compression Service
+[ ] Task 134: Memory compression service — summarize_messages() LLM function
+[ ] Task 135: Memory compression service — compress_if_needed() orchestrator
+
+### 10C. Query Rewriter Integration
+[ ] Task 136: fetch_chat_context() + updated rewrite_query() with summary support
+
+### 10D. Chat Router Integration
+[ ] Task 137: Trigger compression after chat response + clear summaries on DELETE
+
+### 10E. Verification
+[ ] Task 138: Full integration verification (all backend + frontend tests)
+
 === LOG ===
 2026-03-15 — Task 131 complete: Full integration verification — 748/749 backend tests pass (1 pre-existing config test isolation failure), 278/278 frontend tests pass, 31/31 test files pass. Phase 9 Advanced RAG (Re-ranking, Multi-Query, Conversation Memory) complete.
 2026-03-15 — Task 130 complete: SettingsPage.tsx — added RAG Settings section with: pre-retrieval strategy dropdown (None/HyDE/Multi-Query), reranker toggle (switch button with aria-checked), reranker model download section (shows when toggle on, with model name/size, download button or ready indicator, progress bar), chat memory turns number input (0-50 with help text); extended AppConfig interface with pre_retrieval_strategy/use_reranker/chat_memory_turns; added RerankerStatus/RerankerDownloadStatus interfaces; fetches /reranker/status on mount; reranker download with polling; 13 new tests in settings-phase9.test.tsx; all 13 pass; all 19 existing settings tests pass.
