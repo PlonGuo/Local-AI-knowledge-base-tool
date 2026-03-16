@@ -23,6 +23,8 @@ class PreRetrievalStrategy(StrEnum):
     NONE = "none"
     HYDE = "hyde"
     MULTI_QUERY = "multi_query"
+    AUTO = "auto"
+    AUTO_LLM = "auto_llm"
 
 
 class AppConfig(BaseModel):

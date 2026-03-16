@@ -19,9 +19,11 @@ class TestPreRetrievalStrategyEnum:
         assert PreRetrievalStrategy.NONE == "none"
         assert PreRetrievalStrategy.HYDE == "hyde"
         assert PreRetrievalStrategy.MULTI_QUERY == "multi_query"
+        assert PreRetrievalStrategy.AUTO == "auto"
+        assert PreRetrievalStrategy.AUTO_LLM == "auto_llm"
 
     def test_enum_member_count(self):
-        assert len(PreRetrievalStrategy) == 3
+        assert len(PreRetrievalStrategy) == 5
 
 
 class TestAppConfigPhase9Defaults:
