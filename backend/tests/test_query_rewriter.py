@@ -6,6 +6,7 @@ import pytest
 from app.config import AppConfig
 from app.services.query_rewriter import (
     _format_history,
+    fetch_chat_context,
     fetch_chat_history,
     rewrite_query,
 )
@@ -202,3 +203,132 @@ async def test_rewrite_calls_create_chat_model():
         await rewrite_query("test", history, config)
 
     mock_factory.assert_called_once_with(config)
+
+
+# ── fetch_chat_context ────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_fetch_context_returns_tuple():
+    """fetch_chat_context returns (summaries, messages) tuple."""
+    mock_summary_rows = [{"summary": "Previous discussion about BFS."}]
+    mock_msg_rows = [
+        {"role": "assistant", "content": "answer"},
+        {"role": "user", "content": "question"},
+    ]
+
+    mock_cursor_summaries = AsyncMock()
+    mock_cursor_summaries.fetchall.return_value = mock_summary_rows
+
+    mock_cursor_msgs = AsyncMock()
+    mock_cursor_msgs.fetchall.return_value = mock_msg_rows
+
+    mock_db = AsyncMock()
+    mock_db.execute = AsyncMock(side_effect=[mock_cursor_summaries, mock_cursor_msgs])
+
+    class FakeContextManager:
+        async def __aenter__(self):
+            return mock_db
+        async def __aexit__(self, *args):
+            pass
+
+    with patch("app.services.query_rewriter.get_db", return_value=FakeContextManager()):
+        summaries, messages = await fetch_chat_context(5)
+
+    assert summaries == ["Previous discussion about BFS."]
+    assert len(messages) == 2
+
+
+@pytest.mark.asyncio
+async def test_fetch_context_empty_for_zero_turns():
+    summaries, messages = await fetch_chat_context(0)
+    assert summaries == []
+    assert messages == []
+
+
+@pytest.mark.asyncio
+async def test_fetch_context_no_summaries():
+    """When no summaries exist, returns empty list."""
+    mock_cursor_summaries = AsyncMock()
+    mock_cursor_summaries.fetchall.return_value = []
+
+    mock_cursor_msgs = AsyncMock()
+    mock_cursor_msgs.fetchall.return_value = []
+
+    mock_db = AsyncMock()
+    mock_db.execute = AsyncMock(side_effect=[mock_cursor_summaries, mock_cursor_msgs])
+
+    class FakeContextManager:
+        async def __aenter__(self):
+            return mock_db
+        async def __aexit__(self, *args):
+            pass
+
+    with patch("app.services.query_rewriter.get_db", return_value=FakeContextManager()):
+        summaries, messages = await fetch_chat_context(5)
+
+    assert summaries == []
+
+
+# ── rewrite_query with summaries ──────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_rewrite_with_summaries_included_in_prompt():
+    mock_response = MagicMock()
+    mock_response.content = "rewritten"
+    mock_model = AsyncMock()
+    mock_model.ainvoke.return_value = mock_response
+
+    config = AppConfig()
+    history = [{"role": "user", "content": "What about DFS?"}]
+    summaries = ["The user discussed BFS algorithms."]
+
+    with patch("app.services.query_rewriter.create_chat_model", return_value=mock_model):
+        result = await rewrite_query("follow up", history, config, summaries=summaries)
+
+    call_args = mock_model.ainvoke.call_args[0][0]
+    human_msg = call_args[1].content
+    assert "Earlier conversation summaries:" in human_msg
+    assert "The user discussed BFS algorithms." in human_msg
+
+
+@pytest.mark.asyncio
+async def test_rewrite_without_summaries_no_section():
+    mock_response = MagicMock()
+    mock_response.content = "rewritten"
+    mock_model = AsyncMock()
+    mock_model.ainvoke.return_value = mock_response
+
+    config = AppConfig()
+    history = [{"role": "user", "content": "hi"}]
+
+    with patch("app.services.query_rewriter.create_chat_model", return_value=mock_model):
+        await rewrite_query("test", history, config)
+
+    call_args = mock_model.ainvoke.call_args[0][0]
+    human_msg = call_args[1].content
+    assert "Earlier conversation summaries:" not in human_msg
+
+
+@pytest.mark.asyncio
+async def test_rewrite_summaries_only_no_history():
+    """Summaries alone (no recent history) should still trigger rewrite."""
+    mock_response = MagicMock()
+    mock_response.content = "standalone question"
+    mock_model = AsyncMock()
+    mock_model.ainvoke.return_value = mock_response
+
+    config = AppConfig()
+
+    with patch("app.services.query_rewriter.create_chat_model", return_value=mock_model):
+        result = await rewrite_query("test", [], config, summaries=["old summary"])
+
+    assert result == "standalone question"
+
+
+@pytest.mark.asyncio
+async def test_rewrite_no_summaries_no_history_returns_original():
+    config = AppConfig()
+    result = await rewrite_query("test", [], config, summaries=[])
+    assert result == "test"

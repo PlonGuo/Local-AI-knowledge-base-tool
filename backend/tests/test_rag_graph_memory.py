@@ -59,12 +59,15 @@ async def test_full_graph_rewrite_called_when_turns_positive():
 
     config = AppConfig()
 
-    with patch("app.services.rag_graph.fetch_chat_history", new_callable=AsyncMock) as mock_fetch, \
+    with patch("app.services.rag_graph.fetch_chat_context", new_callable=AsyncMock) as mock_fetch, \
          patch("app.services.rag_graph.rewrite_query", new_callable=AsyncMock) as mock_rewrite:
-        mock_fetch.return_value = [
-            {"role": "user", "content": "What is BFS?"},
-            {"role": "assistant", "content": "BFS is breadth-first search."},
-        ]
+        mock_fetch.return_value = (
+            [],  # no summaries
+            [
+                {"role": "user", "content": "What is BFS?"},
+                {"role": "assistant", "content": "BFS is breadth-first search."},
+            ],
+        )
         mock_rewrite.return_value = "What is the time complexity of breadth-first search?"
 
         graph = create_rag_graph(mock_rag, config)
@@ -95,7 +98,7 @@ async def test_full_graph_rewrite_skipped_when_zero():
 
     config = AppConfig()
 
-    with patch("app.services.rag_graph.fetch_chat_history", new_callable=AsyncMock) as mock_fetch, \
+    with patch("app.services.rag_graph.fetch_chat_context", new_callable=AsyncMock) as mock_fetch, \
          patch("app.services.rag_graph.rewrite_query", new_callable=AsyncMock) as mock_rewrite:
 
         graph = create_rag_graph(mock_rag, config)
@@ -119,7 +122,7 @@ async def test_full_graph_rewrite_skipped_when_missing():
 
     config = AppConfig()
 
-    with patch("app.services.rag_graph.fetch_chat_history", new_callable=AsyncMock) as mock_fetch:
+    with patch("app.services.rag_graph.fetch_chat_context", new_callable=AsyncMock) as mock_fetch:
         graph = create_rag_graph(mock_rag, config)
         await graph.ainvoke({"question": "test"})
 
@@ -144,9 +147,9 @@ async def test_prep_graph_rewrite_called():
 
     config = AppConfig()
 
-    with patch("app.services.rag_graph.fetch_chat_history", new_callable=AsyncMock) as mock_fetch, \
+    with patch("app.services.rag_graph.fetch_chat_context", new_callable=AsyncMock) as mock_fetch, \
          patch("app.services.rag_graph.rewrite_query", new_callable=AsyncMock) as mock_rewrite:
-        mock_fetch.return_value = [{"role": "user", "content": "hi"}]
+        mock_fetch.return_value = ([], [{"role": "user", "content": "hi"}])
         mock_rewrite.return_value = "rewritten question"
 
         graph = create_rag_prep_graph(mock_rag, config)
@@ -167,7 +170,7 @@ async def test_prep_graph_rewrite_skipped():
         {"role": "user", "content": "test"},
     ]
 
-    with patch("app.services.rag_graph.fetch_chat_history", new_callable=AsyncMock) as mock_fetch:
+    with patch("app.services.rag_graph.fetch_chat_context", new_callable=AsyncMock) as mock_fetch:
         graph = create_rag_prep_graph(mock_rag)
         await graph.ainvoke({"question": "test"})
 
@@ -193,10 +196,10 @@ async def test_memory_with_hyde():
 
     config = AppConfig()
 
-    with patch("app.services.rag_graph.fetch_chat_history", new_callable=AsyncMock) as mock_fetch, \
+    with patch("app.services.rag_graph.fetch_chat_context", new_callable=AsyncMock) as mock_fetch, \
          patch("app.services.rag_graph.rewrite_query", new_callable=AsyncMock) as mock_rewrite, \
          patch("app.services.rag_graph.generate_hypothetical_doc", new_callable=AsyncMock) as mock_hyde:
-        mock_fetch.return_value = [{"role": "user", "content": "hi"}]
+        mock_fetch.return_value = ([], [{"role": "user", "content": "hi"}])
         mock_rewrite.return_value = "rewritten"
         mock_hyde.return_value = "hypothetical doc"
 
@@ -230,10 +233,10 @@ async def test_memory_with_multi_query():
 
     config = AppConfig()
 
-    with patch("app.services.rag_graph.fetch_chat_history", new_callable=AsyncMock) as mock_fetch, \
+    with patch("app.services.rag_graph.fetch_chat_context", new_callable=AsyncMock) as mock_fetch, \
          patch("app.services.rag_graph.rewrite_query", new_callable=AsyncMock) as mock_rewrite, \
          patch("app.services.rag_graph.expand_queries", new_callable=AsyncMock) as mock_expand:
-        mock_fetch.return_value = [{"role": "user", "content": "hi"}]
+        mock_fetch.return_value = ([], [{"role": "user", "content": "hi"}])
         mock_rewrite.return_value = "rewritten"
         mock_expand.return_value = ["rewritten", "variant"]
 

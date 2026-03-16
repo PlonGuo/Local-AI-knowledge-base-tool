@@ -8,7 +8,7 @@ from langgraph.graph import END, StateGraph
 from app.config import AppConfig
 from app.services.hyde_service import generate_hypothetical_doc
 from app.services.multi_query_service import expand_queries
-from app.services.query_rewriter import fetch_chat_history, rewrite_query
+from app.services.query_rewriter import fetch_chat_context, rewrite_query
 from app.services.rag_service import RAGService
 
 
@@ -69,8 +69,10 @@ def _build_graph_nodes(rag_service, config, reranker_service=None):
 
     async def rewrite_query_node(state: RAGState) -> dict:
         n_turns = state.get("chat_memory_turns", 0)
-        history = await fetch_chat_history(n_turns)
-        rewritten = await rewrite_query(state["question"], history, config)
+        summaries, history = await fetch_chat_context(n_turns)
+        rewritten = await rewrite_query(
+            state["question"], history, config, summaries=summaries
+        )
         return {"question": rewritten}
 
     async def route_pre_retrieval(state: RAGState) -> dict:
