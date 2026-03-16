@@ -56,7 +56,7 @@ describe('Phase 9 Settings', () => {
     })
   })
 
-  it('shows None/HyDE/Multi-Query options', async () => {
+  it('shows all five strategy options including Auto variants', async () => {
     render(<SettingsPage backendUrl={BACKEND} />)
     await waitFor(() => {
       const select = screen.getAllByTestId('pre-retrieval-strategy-select')[0] as HTMLSelectElement
@@ -64,6 +64,8 @@ describe('Phase 9 Settings', () => {
       expect(options).toContain('none')
       expect(options).toContain('hyde')
       expect(options).toContain('multi_query')
+      expect(options).toContain('auto')
+      expect(options).toContain('auto_llm')
     })
   })
 
@@ -160,6 +162,80 @@ describe('Phase 9 Settings', () => {
       const input = screen.getAllByTestId('chat-memory-turns-input')[0] as HTMLInputElement
       fireEvent.change(input, { target: { value: '10' } })
       expect(input.value).toBe('10')
+    })
+  })
+
+  it('loads auto strategy from config', async () => {
+    vi.stubGlobal('fetch', mockFetch({ ...fullConfig, pre_retrieval_strategy: 'auto' }))
+    render(<SettingsPage backendUrl={BACKEND} />)
+    await waitFor(() => {
+      const select = screen.getAllByTestId('pre-retrieval-strategy-select')[0] as HTMLSelectElement
+      expect(select.value).toBe('auto')
+    })
+  })
+
+  it('loads auto_llm strategy from config', async () => {
+    vi.stubGlobal('fetch', mockFetch({ ...fullConfig, pre_retrieval_strategy: 'auto_llm' }))
+    render(<SettingsPage backendUrl={BACKEND} />)
+    await waitFor(() => {
+      const select = screen.getAllByTestId('pre-retrieval-strategy-select')[0] as HTMLSelectElement
+      expect(select.value).toBe('auto_llm')
+    })
+  })
+
+  it('can switch to auto strategy', async () => {
+    render(<SettingsPage backendUrl={BACKEND} />)
+    await waitFor(() => {
+      const select = screen.getAllByTestId('pre-retrieval-strategy-select')[0] as HTMLSelectElement
+      fireEvent.change(select, { target: { value: 'auto' } })
+      expect(select.value).toBe('auto')
+    })
+  })
+
+  it('auto options include trade-off descriptions', async () => {
+    render(<SettingsPage backendUrl={BACKEND} />)
+    await waitFor(() => {
+      const select = screen.getAllByTestId('pre-retrieval-strategy-select')[0] as HTMLSelectElement
+      const autoOption = Array.from(select.options).find(o => o.value === 'auto')
+      const autoLlmOption = Array.from(select.options).find(o => o.value === 'auto_llm')
+      expect(autoOption?.text).toContain('rule-based')
+      expect(autoOption?.text).toContain('fast')
+      expect(autoLlmOption?.text).toContain('LLM')
+      expect(autoLlmOption?.text).toContain('slower')
+    })
+  })
+
+  it('saves auto_llm strategy to config', async () => {
+    const fetchSpy = vi.fn((url: string, options?: any) => {
+      if (url.includes('/config') && options?.method === 'PUT') {
+        const body = JSON.parse(options.body)
+        expect(body.pre_retrieval_strategy).toBe('auto_llm')
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+      }
+      if (url.includes('/config')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(fullConfig) })
+      }
+      if (url.includes('/embedding/models')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+      }
+      if (url.includes('/reranker/status')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(rerankerStatus) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+    })
+    vi.stubGlobal('fetch', fetchSpy)
+    render(<SettingsPage backendUrl={BACKEND} />)
+    await waitFor(() => {
+      const select = screen.getAllByTestId('pre-retrieval-strategy-select')[0] as HTMLSelectElement
+      fireEvent.change(select, { target: { value: 'auto_llm' } })
+    })
+    const saveBtn = await waitFor(() => screen.getAllByTestId('save-button')[0])
+    fireEvent.click(saveBtn)
+    await waitFor(() => {
+      const putCalls = fetchSpy.mock.calls.filter(
+        ([url, opts]: any[]) => url.includes('/config') && opts?.method === 'PUT'
+      )
+      expect(putCalls.length).toBeGreaterThan(0)
     })
   })
 

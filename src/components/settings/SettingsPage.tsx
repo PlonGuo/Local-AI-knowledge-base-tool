@@ -6,7 +6,7 @@ interface AppConfig {
   base_url: string
   api_key: string | null
   embedding_language: 'english' | 'chinese' | 'mixed'
-  pre_retrieval_strategy: 'none' | 'hyde' | 'multi_query'
+  pre_retrieval_strategy: 'none' | 'hyde' | 'multi_query' | 'auto' | 'auto_llm'
   use_reranker: boolean
   chat_memory_turns: number
 }
@@ -440,9 +440,11 @@ export default function SettingsPage({ backendUrl, onBack, onConfigSaved }: Sett
                 }
                 className={selectClass}
               >
-                <option value="none">None</option>
-                <option value="hyde">HyDE</option>
-                <option value="multi_query">Multi-Query</option>
+                <option value="none">None — direct retrieval, no preprocessing</option>
+                <option value="hyde">HyDE — generates hypothetical doc for better matching</option>
+                <option value="multi_query">Multi-Query — expands into multiple search variants</option>
+                <option value="auto">Auto — rule-based strategy selection (fast, no LLM call)</option>
+                <option value="auto_llm">Auto (LLM) — LLM picks the best strategy (slower, more accurate)</option>
               </select>
             </div>
 
